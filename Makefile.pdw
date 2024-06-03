@@ -1,0 +1,25 @@
+#******************************************************************************
+# @file             Makefile.pdw
+#******************************************************************************
+AS=aswin
+CC=gccwin
+LD=ldwin
+
+COPTS=-S -O2 -fno-common -ansi -I. -I./include -I../pdos/pdpclib -I../pdos/src -D__WIN32__ -D__NOBIVA__ -D__PDOS__ -Wall -Werror -ansi -m32 -pedantic
+COBJ=aout.c hashtab.o ld.o lib.o report.o vector.o write7x.o
+
+all: clean slink.exe
+
+slink.exe: $(COBJ)
+  $(LD) -s -o slink.exe ../pdos/pdpclib/w32start.o $(COBJ) ../pdos/pdpclib/msvcrt.a ../pdos/src/kernel32.a
+
+.c.o:
+  $(CC) $(COPTS) -o $*.s $<
+  $(AS) -o $@ $*.s
+  rm -f $*.s
+
+clean:
+  for %f in ($(COBJ)) do ( rm -f %f )
+  
+  rm -f slink
+  rm -f slink.exe

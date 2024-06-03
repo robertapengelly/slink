@@ -1,0 +1,28 @@
+#******************************************************************************
+# @file             Makefile.unix
+#******************************************************************************
+OBJDIR              ?=  $(CURDIR)
+SRCDIR              ?=  $(CURDIR)
+
+VPATH               :=  $(SRCDIR)
+
+CC                  :=  gcc
+CFLAGS              :=  -D_FILE_OFFSET_BITS=64 -I$(OBJDIR) -I$(SRCDIR)/include -O2 -Wall -Werror -Wextra -ansi -pedantic -std=c90
+
+CSRC                :=  aout.c hashtab.c ld.c lib.c report.c vector.c write7x.c
+
+ifeq ($(OS), Windows_NT)
+all: slink.exe
+
+slink.exe: $(CSRC)
+	$(CC) $(CFLAGS) -o $@ $^
+else
+all: slink
+
+slink: $(CSRC)
+	$(CC) $(CFLAGS) -o $@ $^
+endif
+
+clean:
+	if [ -f slink ]; then rm -rf slink; fi
+	if [ -f slink.exe ]; then rm -rf slink.exe; fi
