@@ -27,6 +27,8 @@ typedef     signed int                  int32_t;
 static unsigned long header_size = 0, output_size = 0;
 static void *data = 0, *output = 0, *text = 0;
 
+static struct aout_exec *aout_hdr;
+
 
 struct gr {
 
@@ -82,6 +84,22 @@ static int get_symbol (struct aout_object **obj_out, long *index, const char *na
     }
     
     return 1;
+
+}
+
+static unsigned long get_entry (void) {
+
+    struct aout_object *symobj;
+    long symidx;
+    
+    if (get_symbol (&symobj, &symidx, state->entry, 1)) {
+    
+        report_at (program_name, 0, REPORT_WARNING, "cannot find entry symbol %s; defaulting to 00000000", state->entry);
+        return 0;
+    
+    }
+    
+    return GET_UINT32 (symobj->symtab[symidx].n_value);
 
 }
 
@@ -358,9 +376,9 @@ static int relocate (struct aout_object *object, struct relocation_info *r, int 
             r_symbolnum = GET_UINT32 (r->r_symbolnum) & (3L << 29);
             r_address = GET_INT32 (r->r_address);
             
-            if (((r_symbolnum >> 28) & 0xff) != N_ABS) {
+            if (/*state->format == LD_FORMAT_I386_AOUT || */((r_symbolnum >> 28) & 0xff) != N_ABS) {
             
-                if (state->format == LD_OUTPUT_BIN || state->format == LD_OUTPUT_COM) {
+                if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
                 
                     report_at (object->filename, 0, REPORT_ERROR, "segment relocation at %04x:%04x", r_address / 0xffff, r_address % 0xffff);
                     return 1;
@@ -462,22 +480,105 @@ static int glue (struct aout_object *object) {
 }
 
 
+static int init_aout_object (void) {
+
+    header_size = sizeof (*aout_hdr);
+    
+    if (!state->impure) {
+        header_size = ALIGN_UP (header_size, SECTION_ALIGNMENT);
+    }
+    
+    output_size = header_size + state->text_size + state->data_size;
+    
+    if ((output = malloc (output_size)) == NULL) {
+        return 1;
+    }
+    
+    memset (output, 0, output_size);
+    aout_hdr = output;
+    
+    text = (void *) ((char *) output + header_size);
+    data = (void *) ((char *) text + state->text_size);
+    
+    return 0;
+
+}
+
+static int write_aout_object (unsigned long a_entry) {
+
+    write741_to_byte_array (aout_hdr->a_info, state->impure ? OMAGIC : ZMAGIC);
+    write741_to_byte_array (aout_hdr->a_text, state->text_size);
+    write741_to_byte_array (aout_hdr->a_data, state->data_size);
+    write741_to_byte_array (aout_hdr->a_bss, state->bss_size);
+    write741_to_byte_array (aout_hdr->a_entry, a_entry);
+    write741_to_byte_array (aout_hdr->a_trsize, tgr.relocations_count * sizeof (struct relocation_info));
+    write741_to_byte_array (aout_hdr->a_drsize, dgr.relocations_count * sizeof (struct relocation_info));
+    
+    if (fwrite ((char *) output, output_size, 1, state->ofp) != 1) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "failed to write data to '%s'", state->ofile);
+        return 1;
+    
+    }
+    
+    if (tgr.relocations_count > 0) {
+    
+        if (fwrite (tgr.relocations, tgr.relocations_count * sizeof (struct relocation_info), 1, state->ofp) != 1) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "failed to write text relocations to '%s'", state->ofile);
+            return 1;
+        
+        }
+    
+    }
+    
+    if (dgr.relocations_count > 0) {
+    
+        if (fwrite (dgr.relocations, dgr.relocations_count * sizeof (struct relocation_info), 1, state->ofp) != 1) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "failed to write data relocations to '%s'", state->ofile);
+            return 1;
+        
+        }
+    
+    }
+    
+    return 0;
+
+}
+
+
 int create_executable_from_aout_objects (void) {
 
     struct aout_object *object;
     long i;
     
+    unsigned long entry = 0;
     int err = 0;
-    output_size = state->text_size + state->data_size;
     
-    if ((output = malloc (output_size)) == NULL) {
-        return EXIT_FAILURE;
+    if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
+    
+        output_size = state->text_size + state->data_size;
+        
+        if ((output = malloc (output_size)) == NULL) {
+            return EXIT_FAILURE;
+        }
+        
+        memset (output, 0, output_size);
+        
+        text = (void *) (char *) output;
+        data = (void *) ((char *) text + state->text_size);
+    
+    } else if (state->format == LD_FORMAT_I386_AOUT) {
+    
+        if (init_aout_object ()) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "failed to initialize a.out object");
+            return EXIT_FAILURE;
+        
+        }
+    
     }
-    
-    memset (output, 0, output_size);
-    
-    text = (void *) (char *) output;
-    data = (void *) ((char *) text + state->text_size);
     
     for (i = 0; i < state->nb_aout_objs; ++i) {
         paste (state->aout_objs[i]);
@@ -503,7 +604,13 @@ int create_executable_from_aout_objects (void) {
     
     }
     
-    if (err) { return EXIT_FAILURE; }
+    if (err) {
+        return EXIT_FAILURE;
+    }
+    
+    if (state->format == LD_FORMAT_I386_AOUT) {
+        entry = get_entry ();
+    }
     
     for (i = 0; i < state->nb_aout_objs; i++) {
     
@@ -538,10 +645,23 @@ int create_executable_from_aout_objects (void) {
     
     }
     
-    if (fwrite ((char *) output, output_size, 1, state->ofp) != 1) {
+    if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
     
-        report_at (program_name, 0, REPORT_ERROR, "failed to write data to '%s'", state->ofile);
-        return EXIT_FAILURE;
+        if (fwrite ((char *) output, output_size, 1, state->ofp) != 1) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "failed to write data to '%s'", state->ofile);
+            return EXIT_FAILURE;
+        
+        }
+    
+    } else if (state->format == LD_FORMAT_I386_AOUT) {
+    
+        if (write_aout_object (entry)) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "failed to write a.out object");
+            return EXIT_FAILURE;
+        
+        }
     
     }
     

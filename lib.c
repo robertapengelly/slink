@@ -27,14 +27,17 @@ struct ld_option {
 #define     LD_OPTION_HAS_ARG           1
 
 #define     LD_OPTION_NONE              0
-#define     LD_OPTION_FORMAT            1
-#define     LD_OPTION_HELP              2
-#define     LD_OPTION_IMPURE            3
-#define     LD_OPTION_MAP               4
-#define     LD_OPTION_OUTFILE           5
+#define     LD_OPTION_ENTRY             1
+#define     LD_OPTION_FORMAT            2
+#define     LD_OPTION_HELP              3
+#define     LD_OPTION_IMPURE            4
+#define     LD_OPTION_MAP               5
+#define     LD_OPTION_OUTFILE           6
 
 static struct ld_option opts[] = {
 
+    {   "-N",           LD_OPTION_IMPURE,       LD_OPTION_NO_ARG    },
+    {   "-e",           LD_OPTION_ENTRY,        LD_OPTION_HAS_ARG   },
     {   "-o",           LD_OPTION_OUTFILE,      LD_OPTION_HAS_ARG   },
     
     {   "--oformat",    LD_OPTION_FORMAT,       LD_OPTION_HAS_ARG   },
@@ -53,13 +56,13 @@ static void print_usage (void) {
         fprintf (stderr, "Options:\n\n");
         
         fprintf (stderr, "    -N                    Do not page align data.\n");
-        /*fprintf (stderr, "    -T OFFSET             Offset addresses by the specified offset\n");*/
+        /*fprintf (stderr, "    -T OFFSET             Offset addresses by the specified offset.\n");*/
         
         fprintf (stderr, "    --oformat FORMAT      Specify the format of output file (default msdos)\n");
         fprintf (stderr, "                              Supported formats are:\n");
-        fprintf (stderr, "                                  binary, msdos\n");
+        fprintf (stderr, "                                  a.out-i386, binary, msdos\n");
         
-        /*fprintf (stderr, "    -e ADDRESS            Set start address.\n");*/
+        fprintf (stderr, "    -e ADDRESS            Set start address.\n");
         fprintf (stderr, "    -s                    Ignored.\n");
         
         fprintf (stderr, "    -o FILE               Set output file name (default a.out).\n");
@@ -219,18 +222,36 @@ void parse_args (int argc, char **argv, int optind) {
         
         switch (popt->idx) {
         
+            case LD_OPTION_ENTRY: {
+            
+                if (state->entry) {
+                    free (state->entry);
+                }
+                
+                state->entry = xstrdup (optarg);
+                break;
+            
+            }
+            
             case LD_OPTION_FORMAT: {
             
                 if (xstrcasecmp (optarg, "binary") == 0) {
                 
-                    state->format = LD_OUTPUT_BIN;
+                    state->format = LD_FORMAT_BIN;
                     break;
                 
                 }
                 
                 if (xstrcasecmp (optarg, "msdos") == 0) {
                 
-                    state->format = LD_OUTPUT_COM;
+                    state->format = LD_FORMAT_COM;
+                    break;
+                
+                }
+                
+                if (xstrcasecmp (optarg, "a.out-i386") == 0) {
+                
+                    state->format = LD_FORMAT_I386_AOUT;
                     break;
                 
                 }

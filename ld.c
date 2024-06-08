@@ -651,13 +651,17 @@ int main (int argc, char **argv) {
     
     }
     
+    if (!state->entry || strcmp (state->entry, "") == 0) {
+        state->entry = "_start";
+    }
+    
     if (!state->ofile) {
         state->ofile = xstrdup ("a.out");
     }
     
-    if (state->format == LD_OUTPUT_BIN || state->format == LD_OUTPUT_COM) {
+    if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
     
-        if (state->format == LD_OUTPUT_COM) {
+        if (state->format == LD_FORMAT_COM) {
             state->psp = 0x100;
         }
         

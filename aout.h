@@ -41,6 +41,21 @@ struct nlist {
 
 };
 
+#define     OMAGIC                      0407
+#define     ZMAGIC                      0413
+
+/*struct aout_nlist {
+
+    unsigned char n_strx[4];
+    unsigned char n_type;
+    
+    unsigned char n_other;
+    unsigned char n_desc[2];
+    
+    unsigned char n_value[4];
+
+};*/
+
 #define     N_TYPE                      0x1e
 int create_executable_from_aout_objects (void);
 

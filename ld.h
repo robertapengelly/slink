@@ -44,11 +44,13 @@ struct ld_state {
     long nb_aout_objs;
     
     unsigned long text_size, data_size, bss_size;
+    char *entry;
 
 };
 
-#define     LD_OUTPUT_COM               0x00
-#define     LD_OUTPUT_BIN               0x01
+#define     LD_FORMAT_COM               0x00
+#define     LD_FORMAT_BIN               0x01
+#define     LD_FORMAT_I386_AOUT         0x02
 
 extern struct ld_state *state;
 extern const char *program_name;
