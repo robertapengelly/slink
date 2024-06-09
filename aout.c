@@ -376,7 +376,7 @@ static int relocate (struct aout_object *object, struct relocation_info *r, int 
             r_symbolnum = GET_UINT32 (r->r_symbolnum) & (3L << 29);
             r_address = GET_INT32 (r->r_address);
             
-            if (/*state->format == LD_FORMAT_I386_AOUT || */((r_symbolnum >> 28) & 0xff) != N_ABS) {
+            if (state->format == LD_FORMAT_I386_AOUT || ((r_symbolnum >> 28) & 0xff) != N_ABS) {
             
                 if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
                 

@@ -2,6 +2,8 @@
  * @file            lib.c
  *****************************************************************************/
 #include    <ctype.h>
+#include    <errno.h>
+#include    <limits.h>
 #include    <stdio.h>
 #include    <stdlib.h>
 #include    <string.h>
@@ -33,10 +35,13 @@ struct ld_option {
 #define     LD_OPTION_IMPURE            4
 #define     LD_OPTION_MAP               5
 #define     LD_OPTION_OUTFILE           6
+#define     LD_OPTION_PSP               7
 
 static struct ld_option opts[] = {
 
     {   "-N",           LD_OPTION_IMPURE,       LD_OPTION_NO_ARG    },
+    {   "-T",           LD_OPTION_PSP,          LD_OPTION_HAS_ARG   },
+    
     {   "-e",           LD_OPTION_ENTRY,        LD_OPTION_HAS_ARG   },
     {   "-o",           LD_OPTION_OUTFILE,      LD_OPTION_HAS_ARG   },
     
@@ -56,7 +61,7 @@ static void print_usage (void) {
         fprintf (stderr, "Options:\n\n");
         
         fprintf (stderr, "    -N                    Do not page align data.\n");
-        /*fprintf (stderr, "    -T OFFSET             Offset addresses by the specified offset.\n");*/
+        fprintf (stderr, "    -T OFFSET             Offset addresses by the specified offset.\n");
         
         fprintf (stderr, "    --oformat FORMAT      Specify the format of output file (default msdos)\n");
         fprintf (stderr, "                              Supported formats are:\n");
@@ -285,6 +290,33 @@ void parse_args (int argc, char **argv, int optind) {
                 }
                 
                 state->ofile = xstrdup (optarg);
+                break;
+            
+            }
+            
+            case LD_OPTION_PSP: {
+            
+                long conversion;
+                char *temp;
+                
+                errno = 0;
+                conversion = strtol (optarg, &temp, 0);
+                
+                if (!*optarg || isspace ((int) *optarg) || errno || *temp) {
+                
+                    report_at (program_name, 0, REPORT_ERROR, "bad number for text start");
+                    exit (EXIT_FAILURE);
+                
+                }
+                
+                if (conversion < 0 || conversion > LONG_MAX) {
+                
+                    report_at (program_name, 0, REPORT_ERROR, "text start must be between 0 and %u", ULONG_MAX);
+                    exit (EXIT_FAILURE);
+                
+                }
+                
+                state->psp = (unsigned long) conversion;
                 break;
             
             }
