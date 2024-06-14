@@ -27,8 +27,6 @@ typedef     signed int                  int32_t;
 static unsigned long header_size = 0, output_size = 0;
 static void *data = 0, *output = 0, *text = 0;
 
-static struct aout_exec *aout_hdr;
-
 
 struct gr {
 
@@ -199,7 +197,7 @@ static void apply_slides (struct aout_object *object) {
 
 static void paste (struct aout_object *object) {
 
-    struct aout_exec *header = object->header;
+    struct i386_aout_exec *header = object->header;
     
     char *obj_text, *obj_data;
     unsigned long obj_text_size, obj_data_size, obj_bss_size;
@@ -376,7 +374,7 @@ static int relocate (struct aout_object *object, struct relocation_info *r, int 
             r_symbolnum = GET_UINT32 (r->r_symbolnum) & (3L << 29);
             r_address = GET_INT32 (r->r_address);
             
-            if (state->format == LD_FORMAT_I386_AOUT || ((r_symbolnum >> 28) & 0xff) != N_ABS) {
+            if (state->format == LD_FORMAT_IA16_AOUT || state->format == LD_FORMAT_I386_AOUT || ((r_symbolnum >> 28) & 0xff) != N_ABS) {
             
                 if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
                 
@@ -482,7 +480,11 @@ static int glue (struct aout_object *object) {
 
 static int init_aout_object (void) {
 
-    header_size = sizeof (*aout_hdr);
+    if (state->format == LD_FORMAT_I386_AOUT) {
+        header_size = sizeof (struct i386_aout_exec);
+    } else if (state->format == LD_FORMAT_IA16_AOUT) {
+        header_size = sizeof (struct ia16_aout_exec);
+    }
     
     if (!state->impure) {
         header_size = ALIGN_UP (header_size, SECTION_ALIGNMENT);
@@ -495,7 +497,6 @@ static int init_aout_object (void) {
     }
     
     memset (output, 0, output_size);
-    aout_hdr = output;
     
     text = (void *) ((char *) output + header_size);
     data = (void *) ((char *) text + state->text_size);
@@ -506,13 +507,39 @@ static int init_aout_object (void) {
 
 static int write_aout_object (unsigned long a_entry) {
 
-    write741_to_byte_array (aout_hdr->a_info, state->impure ? OMAGIC : ZMAGIC);
-    write741_to_byte_array (aout_hdr->a_text, state->text_size);
-    write741_to_byte_array (aout_hdr->a_data, state->data_size);
-    write741_to_byte_array (aout_hdr->a_bss, state->bss_size);
-    write741_to_byte_array (aout_hdr->a_entry, a_entry);
-    write741_to_byte_array (aout_hdr->a_trsize, tgr.relocations_count * sizeof (struct relocation_info));
-    write741_to_byte_array (aout_hdr->a_drsize, dgr.relocations_count * sizeof (struct relocation_info));
+    if (state->format == LD_FORMAT_I386_AOUT) {
+    
+        struct i386_aout_exec *aout_hdr = output;
+        
+        write741_to_byte_array (aout_hdr->a_info, state->impure ? OMAGIC : ZMAGIC);
+        write741_to_byte_array (aout_hdr->a_text, state->text_size);
+        write741_to_byte_array (aout_hdr->a_data, state->data_size);
+        write741_to_byte_array (aout_hdr->a_bss, state->bss_size);
+        write741_to_byte_array (aout_hdr->a_entry, a_entry);
+        write741_to_byte_array (aout_hdr->a_trsize, tgr.relocations_count * sizeof (struct relocation_info));
+        write741_to_byte_array (aout_hdr->a_drsize, dgr.relocations_count * sizeof (struct relocation_info));
+    
+    } else if (state->format == LD_FORMAT_IA16_AOUT) {
+    
+        struct ia16_aout_exec *aout_hdr = output;
+        
+        aout_hdr->a_magic[0] = 0x01;
+        aout_hdr->a_magic[1] = 0x03;
+        
+        aout_hdr->a_flags = 0x10;
+        aout_hdr->a_cpu = 0x04;
+        aout_hdr->a_hdrlen = sizeof (*aout_hdr);
+        
+        write741_to_byte_array (aout_hdr->a_text, state->text_size);
+        write741_to_byte_array (aout_hdr->a_data, state->data_size);
+        write741_to_byte_array (aout_hdr->a_bss, state->bss_size);
+        write741_to_byte_array (aout_hdr->a_entry, a_entry);
+        write721_to_byte_array (aout_hdr->a_total, (state->text_size + state->data_size) + 0x8000);
+        
+        write741_to_byte_array (aout_hdr->a_trsize, tgr.relocations_count * sizeof (struct relocation_info));
+        write741_to_byte_array (aout_hdr->a_drsize, dgr.relocations_count * sizeof (struct relocation_info)); 
+    
+    }
     
     if (fwrite ((char *) output, output_size, 1, state->ofp) != 1) {
     
@@ -569,7 +596,7 @@ int create_executable_from_aout_objects (void) {
         text = (void *) (char *) output;
         data = (void *) ((char *) text + state->text_size);
     
-    } else if (state->format == LD_FORMAT_I386_AOUT) {
+    } else if (state->format == LD_FORMAT_IA16_AOUT || state->format == LD_FORMAT_I386_AOUT) {
     
         if (init_aout_object ()) {
         
@@ -608,7 +635,7 @@ int create_executable_from_aout_objects (void) {
         return EXIT_FAILURE;
     }
     
-    if (state->format == LD_FORMAT_I386_AOUT) {
+    if (state->format == LD_FORMAT_IA16_AOUT || state->format == LD_FORMAT_I386_AOUT) {
         entry = get_entry ();
     }
     
@@ -654,7 +681,7 @@ int create_executable_from_aout_objects (void) {
         
         }
     
-    } else if (state->format == LD_FORMAT_I386_AOUT) {
+    } else if (state->format == LD_FORMAT_IA16_AOUT || state->format == LD_FORMAT_I386_AOUT) {
     
         if (write_aout_object (entry)) {
         

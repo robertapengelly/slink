@@ -254,6 +254,13 @@ void parse_args (int argc, char **argv, int optind) {
                 
                 }
                 
+                if (xstrcasecmp (optarg, "a.out-ia16") == 0) {
+                
+                    state->format = LD_FORMAT_IA16_AOUT;
+                    break;
+                
+                }
+                
                 if (xstrcasecmp (optarg, "a.out-i386") == 0) {
                 
                     state->format = LD_FORMAT_I386_AOUT;

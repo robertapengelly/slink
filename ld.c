@@ -70,7 +70,7 @@ static struct vector vec_undef = { 0 };
 
 static int process_aout (void *obj, unsigned long sz, const char *fname, int quiet) {
 
-    struct aout_exec *hdr = obj;
+    struct i386_aout_exec *hdr = obj;
     
     struct aout_object *data_obj;
     struct nlist *symtab;
