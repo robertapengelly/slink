@@ -5,7 +5,7 @@
 #include    <stdlib.h>
 #include    <string.h>
 
-#include    "aout.h"
+#include    "elks.h"
 #include    "hashtab.h"
 #include    "ld.h"
 #include    "lib.h"
@@ -31,9 +31,9 @@ static void cleanup (void) {
     
     }
     
-    for (i = 0; i < state->nb_aout_objs; ++i) {
+    for (i = 0; i < state->nb_elks_objs; ++i) {
     
-        struct aout_object *obj = state->aout_objs[i];
+        struct elks_object *obj = state->elks_objs[i];
         
         if (obj == NULL) {
             continue;
@@ -68,15 +68,15 @@ static unsigned long conv_dec (char *str, long max) {
 static struct hashtab hashtab_globals = { 0 };
 static struct vector vec_undef = { 0 };
 
-static int process_aout (void *obj, unsigned long sz, const char *fname, int quiet) {
+static int process_elks (void *obj, unsigned long sz, const char *fname, int quiet) {
 
-    struct i386_aout_exec *hdr = obj;
+    struct elks_exec *hdr = obj;
     
-    struct aout_object *data_obj;
-    struct nlist *symtab;
+    struct elks_object *data_obj;
+    struct elks_nlist *symtab;
     
-    struct relocation_info *trelocs;
-    struct relocation_info *drelocs;
+    struct elks_relocation_info *trelocs;
+    struct elks_relocation_info *drelocs;
     
     long symtab_count, trelocs_count, drelocs_count;
     unsigned long symtab_off, strtab_off, trelocs_off, drelocs_off;
@@ -84,7 +84,7 @@ static int process_aout (void *obj, unsigned long sz, const char *fname, int qui
     char *strtab;
     long i;
     
-    if (!(hdr->a_info[0] == 0x39 && hdr->a_info[1] == 0x01 && hdr->a_info[2] == 0x64 && hdr->a_info[3] == 0x00)) {
+    if (!(hdr->a_magic[0] == ((ELKS_MAGIC >> 8) & 0xff) && hdr->a_magic[1] == (ELKS_MAGIC & 0xff))) {
     
         if (!quiet) {
             report_at (program_name, 0, REPORT_ERROR, "'%s' is not a valid object", fname);
@@ -94,9 +94,9 @@ static int process_aout (void *obj, unsigned long sz, const char *fname, int qui
     
     }
     
-    for (i = 0; i < state->nb_aout_objs; ++i) {
+    for (i = 0; i < state->nb_elks_objs; ++i) {
     
-        struct aout_object *obj_to_compare = state->aout_objs[i];
+        struct elks_object *obj_to_compare = state->elks_objs[i];
         
         if (obj_to_compare->size != sz) {
             continue;
@@ -155,11 +155,11 @@ static int process_aout (void *obj, unsigned long sz, const char *fname, int qui
     data_obj->drelocs_count = drelocs_count;
     data_obj->symtab_count = symtab_count;
     
-    dynarray_add (&state->aout_objs, &state->nb_aout_objs, data_obj);
+    dynarray_add (&state->elks_objs, &state->nb_elks_objs, data_obj);
     
     for (i = 0; i < symtab_count; ++i) {
     
-        struct nlist *sym = &symtab[i];
+        struct elks_nlist *sym = &symtab[i];
         char *symname = strtab + GET_INT32 (sym->n_strx);
         
         if ((sym->n_type & N_TYPE) == N_UNDF) {
@@ -284,7 +284,7 @@ static int read_ar_obj (FILE *ar_file, const char *root_fname, unsigned long ind
         memset (path, 0, len);
         sprintf (path, "%s(%s)", root_fname, fname);
         
-        if (process_aout (obj, sz, path, 1)) {
+        if (process_elks (obj, sz, path, 1)) {
         
             free (obj);
             return 1;
@@ -293,7 +293,7 @@ static int read_ar_obj (FILE *ar_file, const char *root_fname, unsigned long ind
     
     } else {
     
-        if (process_aout (obj, sz, "", 1)) {
+        if (process_elks (obj, sz, "", 1)) {
         
             free (obj);
             return 1;
@@ -510,13 +510,13 @@ static int process_archive (FILE *ar_file, const char *root_fname) {
             memset (path, 0, len);
             sprintf (path, "%s(%s)", root_fname, fname);
             
-            if ((err = process_aout (obj, sz, path, 1))) {
+            if ((err = process_elks (obj, sz, path, 1))) {
                 free (obj);
             }
         
         } else {
         
-            if ((err = process_aout (obj, sz, "", 1))) {
+            if ((err = process_elks (obj, sz, "", 1))) {
                 free (obj);
             }
         
@@ -609,7 +609,7 @@ static int process_file (const char *fname) {
     
     }
     
-    if ((err = process_aout (obj, obj_sz, fname, 1))) {
+    if ((err = process_elks (obj, obj_sz, fname, 1))) {
     
         report_at (fname, 0, REPORT_ERROR, "file format not recognized");
         free (obj);
@@ -677,9 +677,9 @@ int main (int argc, char **argv) {
     
     }
     
-    if (state->nb_aout_objs > 0) {
+    if (state->nb_elks_objs > 0) {
     
-        if (create_executable_from_aout_objects ()) {
+        if (create_executable_from_elks_objects ()) {
             return EXIT_FAILURE;
         }
     

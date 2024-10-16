@@ -6,17 +6,17 @@
 
 #include    "aout.h"
 
-struct aout_object {
+struct elks_object {
 
     const char *filename;
     void *raw;
     
     unsigned long size;
     
-    struct i386_aout_exec *header;
-    struct relocation_info *trelocs, *drelocs;
+    struct elks_exec *header;
+    struct elks_relocation_info *trelocs, *drelocs;
     
-    struct nlist *symtab;
+    struct elks_nlist *symtab;
     char *strtab;
     
     long symtab_count, trelocs_count, drelocs_count;
@@ -40,8 +40,8 @@ struct ld_state {
     int format, impure;
     int psp;
     
-    struct aout_object **aout_objs;
-    long nb_aout_objs;
+    struct elks_object **elks_objs;
+    long nb_elks_objs;
     
     unsigned long text_size, data_size, bss_size;
     char *entry;

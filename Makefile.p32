@@ -6,7 +6,7 @@ CC=gcc386
 LD=ld386
 
 COPTS=-S -O2 -fno-common -ansi -I. -I./include -I../pdos/pdpclib -I../pdos/src -D__PDOS386__ -D__32BIT__ -D__NOBIVA__ -D__PDOS__ -Wall -Werror -ansi -m32 -pedantic
-COBJ=aout.c hashtab.o ld.o lib.o report.o vector.o write7x.o
+COBJ=elks.c hashtab.o ld.o lib.o report.o vector.o write7x.o
 
 all: clean slink.exe
 
