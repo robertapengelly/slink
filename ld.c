@@ -94,7 +94,7 @@ static int process_elks (void *obj, unsigned long sz, const char *fname, int qui
     
     }
     
-    for (i = 0; i < state->nb_elks_objs; ++i) {
+    /*for (i = 0; i < state->nb_elks_objs; ++i) {
     
         struct elks_object *obj_to_compare = state->elks_objs[i];
         
@@ -106,7 +106,7 @@ static int process_elks (void *obj, unsigned long sz, const char *fname, int qui
             return 0;
         }
     
-    }
+    }*/
     
     if (state->impure) {
     

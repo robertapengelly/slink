@@ -14,8 +14,6 @@
 #include    "report.h"
 #include    "write7x.h"
 
-#include    <limits.h>
-
 typedef     signed char                 int8_t;
 typedef     signed short                int16_t;
 
