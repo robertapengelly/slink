@@ -51,8 +51,10 @@ struct ld_state {
 #define     LD_FORMAT_COM               0x00
 #define     LD_FORMAT_BIN               0x01
 
-#define     LD_FORMAT_IA16_AOUT         0x02
-#define     LD_FORMAT_I386_AOUT         0x04
+#define     LD_FORMAT_IA16_ELKS         0x02
+#define     LD_FORMAT_I386_ELKS         0x04
+
+#define     LD_FORMAT_I386_AOUT         0x08
 
 extern struct ld_state *state;
 extern const char *program_name;

@@ -65,7 +65,8 @@ static void print_usage (void) {
         
         fprintf (stderr, "    --oformat FORMAT      Specify the format of output file (default msdos)\n");
         fprintf (stderr, "                              Supported formats are:\n");
-        fprintf (stderr, "                                  a.out-i386, binary, msdos\n");
+        fprintf (stderr, "                                  a.out-i386, elks-ia16, elks-i386,\n");
+        fprintf (stderr, "                                  binary, msdos\n");
         
         fprintf (stderr, "    -e ADDRESS            Set start address.\n");
         fprintf (stderr, "    -s                    Ignored.\n");
@@ -254,9 +255,16 @@ void parse_args (int argc, char **argv, int optind) {
                 
                 }
                 
-                if (xstrcasecmp (optarg, "a.out-ia16") == 0) {
+                if (xstrcasecmp (optarg, "elks-ia16") == 0) {
                 
-                    state->format = LD_FORMAT_IA16_AOUT;
+                    state->format = LD_FORMAT_IA16_ELKS;
+                    break;
+                
+                }
+                
+                if (xstrcasecmp (optarg, "elks-i386") == 0) {
+                
+                    state->format = LD_FORMAT_I386_ELKS;
                     break;
                 
                 }

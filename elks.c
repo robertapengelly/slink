@@ -373,7 +373,7 @@ static int relocate (struct elks_object *object, struct elks_relocation_info *r,
             r_symbolnum = GET_UINT32 (r->r_symbolnum) & (3L << 29);
             r_address = GET_INT32 (r->r_address);
             
-            if (state->format == LD_FORMAT_IA16_AOUT || state->format == LD_FORMAT_I386_AOUT || ((r_symbolnum >> 28) & 0xff) != N_ABS) {
+            if (state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_I386_AOUT || ((r_symbolnum >> 28) & 0xff) != N_ABS) {
             
                 if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
                 
@@ -481,7 +481,7 @@ static int init_elks_object (void) {
 
     if (state->format == LD_FORMAT_I386_AOUT) {
         header_size = sizeof (struct aout_exec);
-    } else if (state->format == LD_FORMAT_IA16_AOUT) {
+    } else if (state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_ELKS) {
         header_size = sizeof (struct elks_exec);
     }
     
@@ -518,7 +518,7 @@ static int write_elks_object (unsigned long a_entry) {
         write741_to_byte_array (header->a_trsize, tgr.relocations_count * sizeof (struct relocation_info));
         write741_to_byte_array (header->a_drsize, dgr.relocations_count * sizeof (struct relocation_info));
     
-    } else if (state->format == LD_FORMAT_IA16_AOUT) {
+    } else if (state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_ELKS) {
     
         struct elks_exec *header = output;
         
@@ -526,7 +526,7 @@ static int write_elks_object (unsigned long a_entry) {
         header->a_magic[1] = ELKS_MAGIC & 0xff;
         
         header->a_flags = 0x10;
-        header->a_cpu = 0x04;
+        header->a_cpu = (state->format == LD_FORMAT_I386_ELKS) ? 0x10 : 0x04;
         header->a_hdrlen = sizeof (*header);
         
         write741_to_byte_array (header->a_text, state->text_size);
@@ -571,7 +571,7 @@ static int write_elks_object (unsigned long a_entry) {
         
         }
     
-    } else if (state->format == LD_FORMAT_IA16_AOUT) {
+    } else if (state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_ELKS) {
     
         if (tgr.relocations_count > 0) {
         
@@ -623,7 +623,7 @@ int create_executable_from_elks_objects (void) {
         text = (void *) (char *) output;
         data = (void *) ((char *) text + state->text_size);
     
-    } else if (state->format == LD_FORMAT_IA16_AOUT || state->format == LD_FORMAT_I386_AOUT) {
+    } else if (state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_I386_AOUT) {
     
         if (init_elks_object ()) {
         
@@ -662,7 +662,7 @@ int create_executable_from_elks_objects (void) {
         return EXIT_FAILURE;
     }
     
-    if (state->format == LD_FORMAT_IA16_AOUT || state->format == LD_FORMAT_I386_AOUT) {
+    if (state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_I386_AOUT) {
         entry = get_entry ();
     }
     
@@ -708,7 +708,7 @@ int create_executable_from_elks_objects (void) {
         
         }
     
-    } else if (state->format == LD_FORMAT_IA16_AOUT || state->format == LD_FORMAT_I386_AOUT) {
+    } else if (state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_I386_AOUT) {
     
         if (write_elks_object (entry)) {
         

@@ -659,7 +659,7 @@ int main (int argc, char **argv) {
         state->ofile = xstrdup ("a.out");
     }
     
-    if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
+    if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM || state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_ELKS) {
     
         if (state->format == LD_FORMAT_COM) {
             state->psp = 0x100;
@@ -673,6 +673,17 @@ int main (int argc, char **argv) {
     
         if (process_file (state->files[i])) {
             return EXIT_FAILURE;
+        }
+    
+    }
+    
+    if (state->format == LD_FORMAT_IA16_ELKS) {
+    
+        if (state->text_size > 65536L || state->data_size > 65536L || (state->text_size + state->data_size) > 65536L) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "binary to large for elks-ia16");
+            return EXIT_FAILURE;
+        
         }
     
     }
