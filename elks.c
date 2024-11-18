@@ -304,6 +304,7 @@ static int relocate (struct elks_object *object, struct elks_relocation_info *r,
     long result = 0, symbolnum = 0;
     
     int far_call = 0, pcrel = 0, ext = 0, length = 0;
+    /*int need_relocate = 1;*/
     
     symbolnum = r_symbolnum & 0x7ffffff;
     length    = (r_symbolnum & (3LU << 29)) >> 29;
@@ -349,7 +350,25 @@ static int relocate (struct elks_object *object, struct elks_relocation_info *r,
         struct elks_object *symobj;
         long symidx;
         
-        if (!get_symbol (&symobj, &symidx, symname, 0)) {
+        if (strcmp (symname, "__edata") == 0) {
+        
+            int32_t data_addr = ((char *) data - (char *) output) - header_size;
+            data_addr += state->data_size;
+            
+            write741_to_byte_array (symbol->n_value, data_addr / 16);
+            /*need_relocate = 0;*/
+        
+        } else if (strcmp (symname, "__end") == 0) {
+        
+            int32_t data_addr = ((char *) data - (char *) output) - header_size;
+            
+            data_addr += state->data_size;
+            data_addr += state->bss_size;
+            
+            write741_to_byte_array (symbol->n_value, data_addr % 16);
+            /*need_relocate = 0;*/
+        
+        } else if (!get_symbol (&symobj, &symidx, symname, 0)) {
             symbol = &symobj->symtab[symidx];
         } else {
             return 1;
@@ -358,11 +377,13 @@ static int relocate (struct elks_object *object, struct elks_relocation_info *r,
     }
     
     if (pcrel) {
-        result = (long) GET_UINT32 (symbol->n_value) - (GET_INT32 (r->r_address) + length);
+    
+        if (result == 0) {
+            result = (long) GET_UINT32 (symbol->n_value) - (GET_INT32 (r->r_address) + length);
+        }
+    
     } else {
     
-        long r_address;
-        
         if (!ext || (symbol->n_type & N_TYPE) == N_BSS || (symbol->n_type & N_TYPE) == N_DATA || (symbol->n_type & N_TYPE) == N_TEXT) {
         
             struct elks_relocation_info new_relocation;
@@ -392,17 +413,21 @@ static int relocate (struct elks_object *object, struct elks_relocation_info *r,
                 add_relocation (is_data ? &dgr : &tgr, &new_relocation);
             
             }
-        
+            
         }
         
-        r_address = GET_INT32 (r->r_address);
+        if (result == 0) {
         
-        if (length == 4) {
-            result = *(int32_t *) ((char *) output + header_size + r_address);
-        } else if (length == 2) {
-            result = *(int16_t *) ((char *) output + header_size + r_address);
-        } else if (length == 1) {
-            result = *(int8_t *) ((char *) output + header_size + r_address);
+            int32_t r_address = GET_INT32 (r->r_address);
+            
+            if (length == 4) {
+                result = *(int32_t *) ((char *) output + header_size + r_address);
+            } else if (length == 2) {
+                result = *(int16_t *) ((char *) output + header_size + r_address);
+            } else if (length == 1) {
+                result = *(int8_t *) ((char *) output + header_size + r_address);
+            }
+        
         }
         
         if (ext) {
