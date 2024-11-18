@@ -36,19 +36,21 @@ struct ld_option {
 #define     LD_OPTION_MAP               5
 #define     LD_OPTION_OUTFILE           6
 #define     LD_OPTION_PSP               7
+#define     LD_OPTION_SUBSYSTEM         8
 
 static struct ld_option opts[] = {
 
-    {   "-N",           LD_OPTION_IMPURE,       LD_OPTION_NO_ARG    },
-    {   "-T",           LD_OPTION_PSP,          LD_OPTION_HAS_ARG   },
+    {   "-N",               LD_OPTION_IMPURE,       LD_OPTION_NO_ARG    },
+    {   "-T",               LD_OPTION_PSP,          LD_OPTION_HAS_ARG   },
     
-    {   "-e",           LD_OPTION_ENTRY,        LD_OPTION_HAS_ARG   },
-    {   "-o",           LD_OPTION_OUTFILE,      LD_OPTION_HAS_ARG   },
+    {   "-e",               LD_OPTION_ENTRY,        LD_OPTION_HAS_ARG   },
+    {   "-o",               LD_OPTION_OUTFILE,      LD_OPTION_HAS_ARG   },
     
-    {   "--oformat",    LD_OPTION_FORMAT,       LD_OPTION_HAS_ARG   },
-    {   "--help",       LD_OPTION_HELP,         LD_OPTION_NO_ARG    },
+    {   "--oformat",        LD_OPTION_FORMAT,       LD_OPTION_HAS_ARG   },
+    {   "--help",           LD_OPTION_HELP,         LD_OPTION_NO_ARG    },
+    {   "--subsystem",      LD_OPTION_SUBSYSTEM,    LD_OPTION_HAS_ARG   },
     
-    {   0,              0,                      0                   }
+    {   0,                  0,                      0                   }
 
 };
 
@@ -174,6 +176,8 @@ void parse_args (int argc, char **argv, int optind) {
     
     }
     
+    state->subsystem = 3;
+    
     while (optind < argc) {
     
         r = argv[optind++];
@@ -276,6 +280,13 @@ void parse_args (int argc, char **argv, int optind) {
                 
                 }
                 
+                if (xstrcasecmp (optarg, "pe-i386") == 0) {
+                
+                    state->format = LD_FORMAT_I386_PE;
+                    break;
+                
+                }
+                
                 report_at (program_name, 0, REPORT_ERROR, "unrecognised output format '%s'", optarg);
                 exit (EXIT_FAILURE);
             
@@ -332,6 +343,26 @@ void parse_args (int argc, char **argv, int optind) {
                 }
                 
                 state->psp = (unsigned long) conversion;
+                break;
+            
+            }
+            
+            case LD_OPTION_SUBSYSTEM: {
+            
+                long conversion;
+                char *temp;
+                
+                errno = 0;
+                conversion = strtol (optarg, &temp, 0);
+                
+                if (!*optarg || isspace ((int) *optarg) || errno || *temp) {
+                
+                    report_at (program_name, 0, REPORT_ERROR, "bad number for subsystem");
+                    exit (EXIT_FAILURE);
+                
+                }
+                
+                state->subsystem = (unsigned long) conversion;
                 break;
             
             }

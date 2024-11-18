@@ -6,11 +6,13 @@
 #include    <stdio.h>
 #include    <stdlib.h>
 #include    <string.h>
+#include    <time.h>
 
 #include    "aout.h"
 #include    "elks.h"
 #include    "ld.h"
 #include    "lib.h"
+#include    "pe.h"
 #include    "report.h"
 #include    "write7x.h"
 
@@ -352,8 +354,8 @@ static int relocate (struct elks_object *object, struct elks_relocation_info *r,
         
         if (strcmp (symname, "__edata") == 0) {
         
-            int32_t data_addr = ((char *) data - (char *) output) - header_size;
-            data_addr += state->data_size;
+            int32_t data_addr = ((char *) text - (char *) output) - header_size;
+            data_addr += state->text_size;
             
             write741_to_byte_array (symbol->n_value, data_addr / 16);
             /*need_relocate = 0;*/
@@ -627,6 +629,261 @@ static int write_elks_object (unsigned long a_entry) {
 }
 
 
+static struct msdos_header *doshdr;
+static struct pe_header *pehdr;
+static struct pe_optional_header *opthdr;
+
+static struct section_table_entry *section_text;
+static struct section_table_entry *section_data;
+
+unsigned char dos_stub[] = {
+
+    0x0E,   0x1F,   0xBA,   0x0E,   0x00,   0xB4,   0x09,   0xCD,
+    0x21,   0xB8,   0x01,   0x4C,   0xCD,   0x21,   0x54,   0x68,
+    
+    0x69,   0x73,   0x20,   0x70,   0x72,   0x6F,   0x67,   0x72,
+    0x61,   0x6D,   0x20,   0x63,   0x61,   0x6E,   0x6E,   0x6F,
+    
+    0x74,   0x20,   0x62,   0x65,   0x20,   0x72,   0x75,   0x6E,
+    0x20,   0x69,   0x6E,   0x20,   0x44,   0x4F,   0x53,   0x20,
+    
+    0x6D,   0x6F,   0x64,   0x65,   0x2E,   0x0D,   0x0D,   0x0A,
+    0x24,   0x00,   0x00,   0x00,   0x00,   0x00,   0x00,   0x00
+
+};
+
+static int no_sections = 0;
+
+static unsigned short chksum (unsigned int checksum, void *base, int count) {
+
+    register int sum = 0;
+    int *data;
+    
+    if (count && base != NULL) {
+    
+        data = (int *) base;
+        
+        do {
+        
+            sum = *(unsigned short *) data + checksum;
+            data = (int *) ((char *) data + 2);
+            
+            checksum = (unsigned short) sum + (sum >> 16);
+        
+        } while (--count);
+    
+    }
+    
+    return checksum + (checksum >> 16);
+
+}
+
+static int pe_chksum (void *base, unsigned int size) {
+
+    void *remaining_data;
+    int remaining_data_size;
+    
+    unsigned int pe_header_chksum, file_chksum;
+    unsigned int pe_header_size;
+    
+    pe_header_size = (unsigned long) pehdr - (unsigned long) base + \
+        ((unsigned long) &opthdr->Checksum - (unsigned long) pehdr);
+    
+    remaining_data_size = (size - pe_header_size - 4) >> 1;
+    remaining_data = &opthdr->Subsystem;
+    
+    pe_header_chksum = chksum (0, base, pe_header_size >> 1);
+    file_chksum = chksum (pe_header_chksum, remaining_data, remaining_data_size);
+    
+    if (size & 1) {
+        file_chksum += (unsigned short) *((char *) base + size - 1);
+    }
+    
+    return size + file_chksum;
+
+}
+
+static int init_pe_object (void) {
+
+    header_size = sizeof (*doshdr) + sizeof (dos_stub) + sizeof (*pehdr) + sizeof (*opthdr);
+    no_sections = 0;
+    
+    if (state->raw_text_size > 0) {
+    
+        header_size += sizeof (*section_text);
+        no_sections++;
+    
+    }
+    
+    if (state->raw_data_size > 0) {
+    
+        header_size += sizeof (*section_data);
+        no_sections++;
+    
+    }
+    
+    header_size = ALIGN_UP (header_size, SECTION_ALIGNMENT);
+    output_size = header_size + ALIGN_UP (state->text_size, SECTION_ALIGNMENT) + ALIGN_UP (state->data_size, SECTION_ALIGNMENT);
+    
+    if ((output = malloc (output_size)) == NULL) {
+        return 2;
+    }
+    
+    memset (output, 0, output_size);
+    
+    doshdr = (struct msdos_header *) output;
+    pehdr  = (struct pe_header *) ((char *) doshdr + sizeof (*doshdr) + sizeof (dos_stub));
+    opthdr = (struct pe_optional_header *) ((char *) pehdr + sizeof (*pehdr));
+    
+    section_text = (struct section_table_entry *) ((char *) opthdr + sizeof (*opthdr));
+    section_data = (struct section_table_entry *) ((char *) section_text + sizeof (*section_text));
+    
+    text = (void *) ((char *) output + header_size);
+    data = (void *) ((char *) text + ALIGN_UP (state->text_size, SECTION_ALIGNMENT));
+    
+    return 0;
+
+}
+
+static int write_pe_object (unsigned long entry) {
+
+    doshdr->e_magic[0] = 'M';
+    doshdr->e_magic[1] = 'Z';
+    
+    write721_to_byte_array (doshdr->e_cblp, 0x0090);
+    write721_to_byte_array (doshdr->e_cp, 0x0003);
+    
+    write721_to_byte_array (doshdr->e_cparhdr, ALIGN_UP (sizeof (*doshdr), 16) / 16);
+    
+    write721_to_byte_array (doshdr->e_maxalloc, 0xFFFF);
+    write721_to_byte_array (doshdr->e_sp, 0x00B8);
+    
+    write721_to_byte_array (doshdr->e_lfarlc, sizeof (*doshdr));
+    write741_to_byte_array (doshdr->e_lfanew, sizeof (*doshdr) + sizeof (dos_stub));
+    
+    memcpy ((char *)  output + GET_UINT16 (doshdr->e_lfarlc), dos_stub, sizeof (dos_stub));
+    
+    
+    pehdr->Signature[0] = 'P';
+    pehdr->Signature[1] = 'E';
+    
+    write721_to_byte_array (pehdr->Machine, IMAGE_FILE_MACHINE_I386);
+    write721_to_byte_array (pehdr->NumberOfSections, no_sections);
+    write741_to_byte_array (pehdr->TimeDateStamp, time (0));
+    write721_to_byte_array (pehdr->SizeOfOptionalHeader, sizeof (*opthdr));
+    
+    {
+    
+        unsigned short characteristics = 0;
+        
+        characteristics |= IMAGE_FILE_RELOCS_STRIPPED;
+        characteristics |= IMAGE_FILE_EXECUTABLE_IMAGE;
+        characteristics |= IMAGE_FILE_LINE_NUMS_STRIPPED;
+        characteristics |= IMAGE_FILE_LOCAL_SYMS_STRIPPED;
+        characteristics |= IMAGE_FILE_32BIT_MACHINE;
+        characteristics |= IMAGE_FILE_DEBUG_STRIPPED;
+        
+        write721_to_byte_array (pehdr->Characteristics, characteristics);
+    
+    }
+    
+    
+    write721_to_byte_array (opthdr->Magic, IMAGE_FILE_MAGIC_I386);
+    
+    opthdr->MajorLinkerVersion = 2;
+    opthdr->MinorLinkerVersion = 1;
+    
+    write741_to_byte_array (opthdr->SizeOfCode, ALIGN_UP (state->text_size, SECTION_ALIGNMENT));
+    write741_to_byte_array (opthdr->SizeOfInitializedData, ALIGN_UP (state->data_size, SECTION_ALIGNMENT));
+    write741_to_byte_array (opthdr->SizeOfUninitializedData,  ALIGN_UP (state->bss_size, SECTION_ALIGNMENT));
+    write741_to_byte_array (opthdr->AddressOfEntryPoint, ALIGN_UP ((char *) text - (char *) output, SECTION_ALIGNMENT) + entry);
+    write741_to_byte_array (opthdr->BaseOfCode, ALIGN_UP ((char *) text - (char *) output, SECTION_ALIGNMENT));
+    write741_to_byte_array (opthdr->BaseOfData, ALIGN_UP ((char *) data - (char *) output, SECTION_ALIGNMENT));
+    
+    write741_to_byte_array (opthdr->ImageBase, state->psp);
+    write741_to_byte_array (opthdr->SectionAlignment, SECTION_ALIGNMENT);
+    write741_to_byte_array (opthdr->FileAlignment, SECTION_ALIGNMENT);
+    
+    write721_to_byte_array (opthdr->MajorOperatingSystemVersion, 4);
+    write721_to_byte_array (opthdr->MajorImageVersion, 1);
+    write721_to_byte_array (opthdr->MajorSubsystemVersion, 4);
+    
+    write741_to_byte_array (opthdr->SizeOfImage, GET_UINT32 (opthdr->BaseOfData) + ALIGN_UP (GET_UINT32 (opthdr->SizeOfInitializedData), SECTION_ALIGNMENT));
+    write741_to_byte_array (opthdr->SizeOfHeaders, ALIGN_UP (header_size, SECTION_ALIGNMENT));
+    write741_to_byte_array (opthdr->Checksum, pe_chksum (output, output_size));
+    
+    write721_to_byte_array (opthdr->Subsystem, state->subsystem);
+    
+    {
+    
+        unsigned long ibss_addr = ((char *) data - (char *) output) + state->data_size;
+        unsigned long ibss_size = state->bss_size;
+        
+        unsigned long stack_addr = ibss_addr + ibss_size;
+        unsigned long stack_size = ALIGN_UP (stack_addr, SECTION_ALIGNMENT);
+        
+        write741_to_byte_array (opthdr->SizeOfStackReserved, SECTION_ALIGNMENT << 9);
+        write741_to_byte_array (opthdr->SizeOfStackCommit, ALIGN_UP (stack_addr % 16 + stack_size, SECTION_ALIGNMENT));
+        write741_to_byte_array (opthdr->SizeOfHeapReserved, SECTION_ALIGNMENT << 8);
+        write741_to_byte_array (opthdr->SizeOfHeapCommit, ALIGN_UP (stack_addr % 16 + stack_size, SECTION_ALIGNMENT));
+    
+    }
+    
+    write741_to_byte_array (opthdr->NumberOfRvaAndSizes, 16);
+    
+    
+    if (state->raw_text_size > 0) {
+    
+        unsigned long characteristics = 0;
+        memcpy (section_text->Name, ".text", 5);
+        
+        write741_to_byte_array (section_text->VirtualSize, state->text_size);
+        write741_to_byte_array (section_text->VirtualAddress, GET_UINT32 (opthdr->BaseOfCode));
+        write741_to_byte_array (section_text->SizeOfRawData, state->raw_text_size);
+        write741_to_byte_array (section_text->PointerToRawData, ((char *) text - (char *) output));
+        
+        characteristics |= IMAGE_SCN_CNT_CODE;
+        characteristics |= IMAGE_SCN_ALIGN_4BYTES;
+        characteristics |= IMAGE_SCN_MEM_EXECUTE;
+        characteristics |= IMAGE_SCN_MEM_READ;
+        
+        write741_to_byte_array (section_text->Characteristics, characteristics);
+    
+    }
+    
+    if (state->raw_data_size > 0) {
+    
+        unsigned long characteristics = 0;
+        memcpy (section_text->Name, ".data", 5);
+        
+        write741_to_byte_array (section_data->VirtualSize, state->data_size);
+        write741_to_byte_array (section_data->VirtualAddress, GET_UINT32 (opthdr->BaseOfData));
+        write741_to_byte_array (section_data->SizeOfRawData, state->raw_data_size);
+        write741_to_byte_array (section_data->PointerToRawData, ((char *) data - (char *) output));
+        
+        characteristics |= IMAGE_SCN_CNT_INITIALIZED_DATA;
+        characteristics |= IMAGE_SCN_ALIGN_4BYTES;
+        characteristics |= IMAGE_SCN_MEM_READ;
+        characteristics |= IMAGE_SCN_MEM_WRITE;
+        
+        write741_to_byte_array (section_data->Characteristics, characteristics);
+    
+    }
+    
+    
+    /* write the file */
+    if (fwrite ((char *) output, output_size, 1, state->ofp) != 1) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "failed to write data to '%s'", state->ofile);
+        return 1;
+    
+    }
+    
+    return 0;
+
+}
+
+
 int create_executable_from_elks_objects (void) {
 
     struct elks_object *object;
@@ -653,6 +910,15 @@ int create_executable_from_elks_objects (void) {
         if (init_elks_object ()) {
         
             report_at (program_name, 0, REPORT_ERROR, "failed to initialize a.out object");
+            return EXIT_FAILURE;
+        
+        }
+    
+    } else if (state->format == LD_FORMAT_I386_PE) {
+    
+        if (init_pe_object ()) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "failed to initialize pe object");
             return EXIT_FAILURE;
         
         }
@@ -687,7 +953,7 @@ int create_executable_from_elks_objects (void) {
         return EXIT_FAILURE;
     }
     
-    if (state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_I386_AOUT) {
+    if (state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_I386_AOUT || state->format == LD_FORMAT_I386_PE) {
         entry = get_entry ();
     }
     
@@ -742,6 +1008,14 @@ int create_executable_from_elks_objects (void) {
         
         }
     
+    } else if (state->format == LD_FORMAT_I386_PE) {
+    
+        if (write_pe_object (entry)) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "failed to write pe object");
+            return EXIT_FAILURE;
+        
+        }
     }
     
     return EXIT_SUCCESS;

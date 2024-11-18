@@ -24,6 +24,8 @@ struct elks_object {
 
 };
 
+#define     GET_UINT16(arr)             ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8))
+
 #define     GET_INT32(arr)              ((long) arr[0] | (((long) arr[1]) << 8) | (((long) arr[2]) << 16) | (((long) arr[3]) << 24))
 #define     GET_UINT32(arr)             ((unsigned long) arr[0] | (((unsigned long) arr[1]) << 8) | (((unsigned long) arr[2]) << 16) | (((unsigned long) arr[3]) << 24))
 
@@ -43,7 +45,10 @@ struct ld_state {
     struct elks_object **elks_objs;
     long nb_elks_objs;
     
+    unsigned long raw_text_size, raw_data_size, raw_bss_size;
     unsigned long text_size, data_size, bss_size;
+    
+    unsigned long subsystem;
     char *entry;
 
 };
@@ -55,11 +60,11 @@ struct ld_state {
 #define     LD_FORMAT_I386_ELKS         0x04
 
 #define     LD_FORMAT_I386_AOUT         0x08
+#define     LD_FORMAT_I386_PE           0x10
 
 extern struct ld_state *state;
 extern const char *program_name;
 
-#define     FILE_ALIGNMENT              512
 #define     SECTION_ALIGNMENT           4096
 
 #define     DIV_ROUNDUP(a, b)           (((a) + ((b) - 1)) / (b))

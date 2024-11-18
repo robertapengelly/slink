@@ -108,6 +108,10 @@ static int process_elks (void *obj, unsigned long sz, const char *fname, int qui
     
     }*/
     
+    state->raw_text_size    += GET_UINT32 (hdr->a_text);
+    state->raw_data_size    += GET_UINT32 (hdr->a_data);
+    state->raw_bss_size     += GET_UINT32 (hdr->a_bss);
+    
     if (state->impure) {
     
         state->text_size    += GET_UINT32 (hdr->a_text);
@@ -667,6 +671,8 @@ int main (int argc, char **argv) {
         
         state->impure = 1;
     
+    } else if (state->format == LD_FORMAT_I386_PE) {
+        state->psp = 0x00400000;
     }
     
     for (i = 0; i < state->nb_files; i++) {
