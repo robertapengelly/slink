@@ -120,9 +120,19 @@ static int process_elks (void *obj, unsigned long sz, const char *fname, int qui
     
     } else {
     
-        state->text_size    += ALIGN_UP (GET_UINT32 (hdr->a_text),   SECTION_ALIGNMENT);
-        state->data_size    += ALIGN_UP (GET_UINT32 (hdr->a_data),   SECTION_ALIGNMENT);
-        state->bss_size     += ALIGN_UP (GET_UINT32 (hdr->a_bss),    SECTION_ALIGNMENT);
+        if (state->format == LD_FORMAT_I386_PE) {
+        
+            state->text_size    += ALIGN_UP (GET_UINT32 (hdr->a_text),  FILE_ALIGNMENT);
+            state->data_size    += ALIGN_UP (GET_UINT32 (hdr->a_data),  FILE_ALIGNMENT);
+            state->bss_size     += ALIGN_UP (GET_UINT32 (hdr->a_bss),   FILE_ALIGNMENT);
+        
+        } else {
+        
+            state->text_size    += ALIGN_UP (GET_UINT32 (hdr->a_text),  SECTION_ALIGNMENT);
+            state->data_size    += ALIGN_UP (GET_UINT32 (hdr->a_data),  SECTION_ALIGNMENT);
+            state->bss_size     += ALIGN_UP (GET_UINT32 (hdr->a_bss),   SECTION_ALIGNMENT);
+        
+        }
     
     }
     

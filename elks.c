@@ -209,7 +209,13 @@ static void paste (struct elks_object *object) {
     if (state->impure) {
         obj_text_size = GET_UINT32 (header->a_text);
     } else {
-        obj_text_size = ALIGN_UP (GET_UINT32 (header->a_text), SECTION_ALIGNMENT);
+    
+        if (state->format == LD_FORMAT_I386_PE) {
+            obj_text_size = ALIGN_UP (GET_UINT32 (header->a_text), FILE_ALIGNMENT);
+        } else {
+            obj_text_size = ALIGN_UP (GET_UINT32 (header->a_text), SECTION_ALIGNMENT);
+        }
+    
     }
     
     memcpy ((char *) text + text_ptr, obj_text, GET_UINT32 (header->a_text));
@@ -221,7 +227,13 @@ static void paste (struct elks_object *object) {
     if (state->impure) {
         obj_data_size = GET_UINT32 (header->a_data);
     } else {
-        obj_data_size = ALIGN_UP (GET_UINT32 (header->a_data), SECTION_ALIGNMENT);
+    
+        if (state->format == LD_FORMAT_I386_PE) {
+            obj_data_size = ALIGN_UP (GET_UINT32 (header->a_data), FILE_ALIGNMENT);
+        } else {
+            obj_data_size = ALIGN_UP (GET_UINT32 (header->a_data), SECTION_ALIGNMENT);
+        }
+    
     }
     
     memcpy ((char *) data + data_ptr, obj_data, GET_UINT32 (header->a_data));
@@ -232,7 +244,13 @@ static void paste (struct elks_object *object) {
     if (state->impure) {
         obj_bss_size = GET_UINT32 (header->a_bss);
     } else {
-        obj_bss_size = ALIGN_UP (GET_UINT32 (header->a_bss), SECTION_ALIGNMENT);
+    
+        if (state->format == LD_FORMAT_I386_PE) {
+            obj_bss_size = ALIGN_UP (GET_UINT32 (header->a_bss), FILE_ALIGNMENT);
+        } else {
+            obj_bss_size = ALIGN_UP (GET_UINT32 (header->a_bss), SECTION_ALIGNMENT);
+        }
+    
     }
     
     bss_ptr += obj_bss_size;
@@ -654,76 +672,70 @@ unsigned char dos_stub[] = {
 
 static int no_sections = 0;
 
-static unsigned short chksum (unsigned int checksum, void *base, int count) {
+static unsigned long bytearray_read_4_bytes (unsigned char *src) {
 
-    register int sum = 0;
-    int *data;
+    unsigned long value = 0;
+    int i;
     
-    if (count && base != NULL) {
-    
-        data = (int *) base;
-        
-        do {
-        
-            sum = *(unsigned short *) data + checksum;
-            data = (int *) ((char *) data + 2);
-            
-            checksum = (unsigned short) sum + (sum >> 16);
-        
-        } while (--count);
-    
+    for (i = 0; i < 4; i++) {
+        value |= (unsigned long) src[i] << (CHAR_BIT * i);
     }
     
-    return checksum + (checksum >> 16);
+    return value;
 
 }
 
-static int pe_chksum (void *base, unsigned int size) {
+static unsigned long pe_chksum (unsigned char *base, unsigned long chksum_off, unsigned long size) {
 
-    void *remaining_data;
-    int remaining_data_size;
+    unsigned long checksum = 0, data, i;
+    int carry;
     
-    unsigned int pe_header_chksum, file_chksum;
-    unsigned int pe_header_size;
+    for (i = 0; i < size / 4; i++) {
     
-    pe_header_size = (unsigned long) pehdr - (unsigned long) base + \
-        ((unsigned long) &opthdr->Checksum - (unsigned long) pehdr);
+        if (i == chksum_off / 4) {
+            continue;
+        }
+        
+        data  = bytearray_read_4_bytes (base + i * 4);
+        
+        carry = checksum > 0xFFFFFFFFLU - data;
+        
+        checksum += data;
+        checksum += carry;
+        
+        checksum &= 0xFFFFFFFFLU;
     
-    remaining_data_size = (size - pe_header_size - 4) >> 1;
-    remaining_data = &opthdr->Subsystem;
-    
-    pe_header_chksum = chksum (0, base, pe_header_size >> 1);
-    file_chksum = chksum (pe_header_chksum, remaining_data, remaining_data_size);
-    
-    if (size & 1) {
-        file_chksum += (unsigned short) *((char *) base + size - 1);
     }
     
-    return size + file_chksum;
+    checksum = (checksum >> 16) + (checksum & 0xFFFF);
+    
+    checksum += checksum >> 16;
+    checksum &= 0xFFFF;
+    checksum += size;
+    
+    return checksum & 0xFFFFFFFFLU;
 
 }
 
 static int init_pe_object (void) {
 
     header_size = sizeof (*doshdr) + sizeof (dos_stub) + sizeof (*pehdr) + sizeof (*opthdr);
+    
+    header_size += sizeof (*section_data);
+    header_size += sizeof (*section_text);
+    
     no_sections = 0;
     
     if (state->raw_text_size > 0) {
-    
-        header_size += sizeof (*section_text);
         no_sections++;
-    
     }
     
     if (state->raw_data_size > 0) {
-    
-        header_size += sizeof (*section_data);
         no_sections++;
-    
     }
     
-    header_size = ALIGN_UP (header_size, SECTION_ALIGNMENT);
-    output_size = header_size + ALIGN_UP (state->text_size, SECTION_ALIGNMENT) + ALIGN_UP (state->data_size, SECTION_ALIGNMENT);
+    header_size = ALIGN_UP (header_size, FILE_ALIGNMENT);
+    output_size = header_size + state->text_size + state->data_size;
     
     if ((output = malloc (output_size)) == NULL) {
         return 2;
@@ -739,7 +751,7 @@ static int init_pe_object (void) {
     section_data = (struct section_table_entry *) ((char *) section_text + sizeof (*section_text));
     
     text = (void *) ((char *) output + header_size);
-    data = (void *) ((char *) text + ALIGN_UP (state->text_size, SECTION_ALIGNMENT));
+    data = (void *) ((char *) text + ALIGN_UP (state->text_size, FILE_ALIGNMENT));
     
     return 0;
 
@@ -747,6 +759,8 @@ static int init_pe_object (void) {
 
 static int write_pe_object (unsigned long entry) {
 
+    unsigned long checksum_pos, size;
+    
     doshdr->e_magic[0] = 'M';
     doshdr->e_magic[1] = 'Z';
     
@@ -761,7 +775,7 @@ static int write_pe_object (unsigned long entry) {
     write721_to_byte_array (doshdr->e_lfarlc, sizeof (*doshdr));
     write741_to_byte_array (doshdr->e_lfanew, sizeof (*doshdr) + sizeof (dos_stub));
     
-    memcpy ((char *)  output + GET_UINT16 (doshdr->e_lfarlc), dos_stub, sizeof (dos_stub));
+    memcpy ((char *) output + GET_UINT16 (doshdr->e_lfarlc), dos_stub, sizeof (dos_stub));
     
     
     pehdr->Signature[0] = 'P';
@@ -790,28 +804,35 @@ static int write_pe_object (unsigned long entry) {
     
     write721_to_byte_array (opthdr->Magic, IMAGE_FILE_MAGIC_I386);
     
-    opthdr->MajorLinkerVersion = 2;
-    opthdr->MinorLinkerVersion = 1;
+    opthdr->MajorLinkerVersion = 0;
+    opthdr->MinorLinkerVersion = 10;
     
-    write741_to_byte_array (opthdr->SizeOfCode, ALIGN_UP (state->text_size, SECTION_ALIGNMENT));
-    write741_to_byte_array (opthdr->SizeOfInitializedData, ALIGN_UP (state->data_size, SECTION_ALIGNMENT));
-    write741_to_byte_array (opthdr->SizeOfUninitializedData,  ALIGN_UP (state->bss_size, SECTION_ALIGNMENT));
+    write741_to_byte_array (opthdr->SizeOfCode, state->text_size);
+    write741_to_byte_array (opthdr->SizeOfInitializedData, state->data_size);
+    write741_to_byte_array (opthdr->SizeOfUninitializedData, state->bss_size);
     write741_to_byte_array (opthdr->AddressOfEntryPoint, ALIGN_UP ((char *) text - (char *) output, SECTION_ALIGNMENT) + entry);
-    write741_to_byte_array (opthdr->BaseOfCode, ALIGN_UP ((char *) text - (char *) output, SECTION_ALIGNMENT));
-    write741_to_byte_array (opthdr->BaseOfData, ALIGN_UP ((char *) data - (char *) output, SECTION_ALIGNMENT));
+    
+    if (state->raw_text_size > 0) {
+        write741_to_byte_array (opthdr->BaseOfCode, ALIGN_UP (state->text_size, SECTION_ALIGNMENT));
+    }
+    
+    if (state->raw_data_size > 0) {
+        write741_to_byte_array (opthdr->BaseOfData, ALIGN_UP (state->data_size, SECTION_ALIGNMENT));
+    }
     
     write741_to_byte_array (opthdr->ImageBase, state->psp);
+    
     write741_to_byte_array (opthdr->SectionAlignment, SECTION_ALIGNMENT);
-    write741_to_byte_array (opthdr->FileAlignment, SECTION_ALIGNMENT);
+    write741_to_byte_array (opthdr->FileAlignment, FILE_ALIGNMENT);
     
     write721_to_byte_array (opthdr->MajorOperatingSystemVersion, 4);
     write721_to_byte_array (opthdr->MajorImageVersion, 1);
     write721_to_byte_array (opthdr->MajorSubsystemVersion, 4);
     
-    write741_to_byte_array (opthdr->SizeOfImage, GET_UINT32 (opthdr->BaseOfData) + ALIGN_UP (GET_UINT32 (opthdr->SizeOfInitializedData), SECTION_ALIGNMENT));
-    write741_to_byte_array (opthdr->SizeOfHeaders, ALIGN_UP (header_size, SECTION_ALIGNMENT));
-    write741_to_byte_array (opthdr->Checksum, pe_chksum (output, output_size));
+    size = GET_UINT32 (opthdr->BaseOfCode) + GET_UINT32 (opthdr->SizeOfCode) + GET_UINT32 (opthdr->BaseOfData) + GET_UINT32 (opthdr->SizeOfInitializedData);
+    write741_to_byte_array (opthdr->SizeOfImage, ALIGN_UP (size, SECTION_ALIGNMENT));
     
+    write741_to_byte_array (opthdr->SizeOfHeaders, header_size);
     write721_to_byte_array (opthdr->Subsystem, state->subsystem);
     
     {
@@ -837,9 +858,9 @@ static int write_pe_object (unsigned long entry) {
         unsigned long characteristics = 0;
         memcpy (section_text->Name, ".text", 5);
         
-        write741_to_byte_array (section_text->VirtualSize, state->text_size);
+        write741_to_byte_array (section_text->VirtualSize, state->raw_text_size);
         write741_to_byte_array (section_text->VirtualAddress, GET_UINT32 (opthdr->BaseOfCode));
-        write741_to_byte_array (section_text->SizeOfRawData, state->raw_text_size);
+        write741_to_byte_array (section_text->SizeOfRawData, state->text_size);
         write741_to_byte_array (section_text->PointerToRawData, ((char *) text - (char *) output));
         
         characteristics |= IMAGE_SCN_CNT_CODE;
@@ -856,9 +877,9 @@ static int write_pe_object (unsigned long entry) {
         unsigned long characteristics = 0;
         memcpy (section_text->Name, ".data", 5);
         
-        write741_to_byte_array (section_data->VirtualSize, state->data_size);
+        write741_to_byte_array (section_data->VirtualSize, state->raw_data_size);
         write741_to_byte_array (section_data->VirtualAddress, GET_UINT32 (opthdr->BaseOfData));
-        write741_to_byte_array (section_data->SizeOfRawData, state->raw_data_size);
+        write741_to_byte_array (section_data->SizeOfRawData, state->data_size);
         write741_to_byte_array (section_data->PointerToRawData, ((char *) data - (char *) output));
         
         characteristics |= IMAGE_SCN_CNT_INITIALIZED_DATA;
@@ -869,6 +890,9 @@ static int write_pe_object (unsigned long entry) {
         write741_to_byte_array (section_data->Characteristics, characteristics);
     
     }
+    
+    checksum_pos = sizeof (*doshdr) + sizeof (dos_stub) + sizeof (*pehdr) + offsetof (struct pe_optional_header, Checksum);
+    write741_to_byte_array (opthdr->Checksum, pe_chksum (output, checksum_pos, output_size));
     
     
     /* write the file */
@@ -938,7 +962,13 @@ int create_executable_from_elks_objects (void) {
     }
     
     if (!state->impure) {
-        state->bss_size = ALIGN_UP (state->bss_size, SECTION_ALIGNMENT);
+    
+        if (state->format == LD_FORMAT_I386_PE) {
+            state->bss_size = ALIGN_UP (state->bss_size, FILE_ALIGNMENT);
+        } else {
+            state->bss_size = ALIGN_UP (state->bss_size, SECTION_ALIGNMENT);
+        }
+    
     }
     
     for (i = 0; i < state->nb_elks_objs; ++i) {

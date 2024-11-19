@@ -66,6 +66,7 @@ extern struct ld_state *state;
 extern const char *program_name;
 
 #define     SECTION_ALIGNMENT           4096
+#define     FILE_ALIGNMENT              512
 
 #define     DIV_ROUNDUP(a, b)           (((a) + ((b) - 1)) / (b))
 #define     ALIGN_UP(x, a)              (DIV_ROUNDUP ((x), (a)) * (a))
