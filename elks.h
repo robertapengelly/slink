@@ -32,6 +32,7 @@ struct elks_exec {
 #define     N_TEXT                      0x04
 #define     N_DATA                      0x06
 #define     N_BSS                       0x08
+#define     N_COMM                      0x12
 
 struct elks_relocation_info {
 
@@ -55,8 +56,8 @@ struct elks_nlist {
 };
 
 #define     N_TYPE                      0x1e
-int create_executable_from_elks_objects (void);
-
 #define     ELKS_MAGIC                  0403
+
+void read_elks_object (const char *filename, unsigned char *data, unsigned long data_size);
 
 #endif      /* _ELKS_H */

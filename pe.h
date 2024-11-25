@@ -4,6 +4,9 @@
 #ifndef     _PE_H
 #define     _PE_H
 
+#define     DEFAULT_SECTION_ALIGNMENT       0x1000
+#define     DEFAULT_FILE_ALIGNMENT          0x0200
+
 struct msdos_header {
 
     unsigned char e_magic[2];           /* Magic number                         */
@@ -27,6 +30,19 @@ struct msdos_header {
     unsigned char e_lfanew[4];          /* File address of new exe header       */
 
 };
+
+#define     IMAGE_SUBSYSTEM_UNKNOWN                         0
+#define     IMAGE_SUBSYSTEM_NATIVE                          1
+#define     IMAGE_SUBSYSTEM_WINDOWS_GUI                     2
+#define     IMAGE_SUBSYSTEM_WINDOWS_CUI                     3
+#define     IMAGE_SUBSYSTEM_OS2_CUI                         5
+#define     IMAGE_SUBSYSTEM_POSIX_CUI                       7
+#define     IMAGE_SUBSYSTEM_EFI_APPLICATION                 10
+#define     IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER         11
+#define     IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER              12
+#define     IMAGE_SUBSYSTEM_EFI_ROM                         13
+#define     IMAGE_SUBSYSTEM_XBOX                            14
+#define     IMAGE_SUBSYSTEM_WINDOWS_BOOT_APPILCATION        16
 
 struct pe_header {
 
@@ -105,7 +121,7 @@ struct pe_optional_header {
 
 #define     IMAGE_FILE_MAGIC_I386                           0x010B
 
-struct section_table_entry {
+struct pe_section_table_entry {
 
     char Name[8];
     
@@ -124,54 +140,67 @@ struct section_table_entry {
 
 };
 
+#define     IMAGE_SCN_TYPE_NOLOAD                           0x00000002
 #define     IMAGE_SCN_CNT_CODE                              0x00000020
 #define     IMAGE_SCN_CNT_INITIALIZED_DATA                  0x00000040
 #define     IMAGE_SCN_CNT_UNINITIALIZED_DATA                0x00000080
+#define     IMAGE_SCN_LNK_INFO                              0x00000200
+#define     IMAGE_SCN_LNK_REMOVE                            0x00000800
 #define     IMAGE_SCN_ALIGN_4BYTES                          0x00300000
+#define     IMAGE_SCN_MEM_SHARED                            0x10000000
 #define     IMAGE_SCN_MEM_EXECUTE                           0x20000000
 #define     IMAGE_SCN_MEM_READ                              0x40000000
 #define     IMAGE_SCN_MEM_WRITE                             0x80000000
 
-struct relocation_entry {
+struct pe_image_data_directory {
 
-    unsigned int VirtualAddress;
-    unsigned int SymbolTableIndex;
-    
-    unsigned short Type;
+    unsigned char VirtualAddress[4];
+    unsigned char Size[4];
 
 };
 
-#define     RELOCATION_ENTRY_SIZE                           10
+struct pe_base_relocation {
 
-#define     IMAGE_REL_I386_ABSOLUTE                         0x0000
-#define     IMAGE_REL_I386_DIR32                            0x0006
-#define     IMAGE_REL_I386_DIR32NB                          0x0007
-#define     IMAGE_REL_I386_REL32                            0x0014
-
-struct symbol_table_entry {
-
-    char Name[8];
-    unsigned int Value;
-    
-    signed short SectionNumber;
-    unsigned short Type;
-    
-    unsigned char StorageClass;
-    unsigned char NumberOfAuxSymbols;
+    unsigned char RVAOfBlock[4];
+    unsigned char SizeOfBlock[4];
 
 };
 
-#define     SYMBOL_TABLE_ENTRY_SIZE                         18
-#define     IMAGE_SYM_UNDEFINED                             0
+#define     BASE_RELOCATION_PAGE_SIZE                       4096
 
-#define     IMAGE_SYM_ABSOLUTE                              -1
-#define     IMAGE_SYM_DEBUG                                 -2
+#define     IMAGE_REL_BASED_ABSOLUTE                        0
+#define     IMAGE_REL_BASED_HIGH                            1
+#define     IMAGE_REL_BASED_LOW                             2
+#define     IMAGE_REL_BASED_HIGHLOW                         3
+#define     IMAGE_REL_BASED_HIGHADJ                         4
+#define     IMAGE_REL_BASED_MIPS_JMPADDR                    5
+#define     IMAGE_REL_BASED_ARM_MOV32                       5
+#define     IMAGE_REL_BASED_RISCV_HIGH20                    5
+#define     IMAGE_REL_BASED_THUMB_MOV32                     7
+#define     IMAGE_REL_BASED_RISCV_LOW12I                    7
+#define     IMAGE_REL_BASED_RISCV_LOW12S                    8
+#define     IMAGE_REL_BASED_MIPS_JMPADDR16                  9
+#define     IMAGE_REL_BASED_DIR64                           10
 
-#define     IMAGE_SYM_TYPE_NULL                             0
-#define     IMAGE_SYM_DTYPE_NULL                            0
+struct pe_import_directory_table {
 
-#define     IMAGE_SYM_CLASS_EXTERNAL                        2
-#define     IMAGE_SYM_CLASS_STATIC                          3
-#define     IMAGE_SYM_CLASS_FILE                            103
+    unsigned char ImportNameTableRVA[4];
+    unsigned char TimeDateStamp[4];
+    unsigned char ForwarderChain[4];
+    unsigned char NameRVA[4];
+    unsigned char ImportAddressTableRVA[4];
+
+};
+
+int pe_check_option (const char *cmd_arg, int argc, char **argv, int *optind, const char **optarg);
+
+void pe_after_link (void);
+void pe_before_link (void);
+void pe_print_help (void);
+
+unsigned long pe_get_first_section_rva (void);
+
+void pe_write (const char *filename);
+void pe_use_option (const char *cmd_arg, int idx, const char *optarg);
 
 #endif      /* _PE_H */

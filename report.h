@@ -16,6 +16,7 @@
 
 #define     REPORT_WARNING              0
 #define     REPORT_ERROR                1
+#define     REPORT_NOTE                 2
 #define     REPORT_FATAL_ERROR          3
 #define     REPORT_INTERNAL_ERROR       4
 

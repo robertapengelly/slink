@@ -110,13 +110,17 @@ static void output_message (const char *filename, unsigned int lineno, unsigned 
         
         fprintf (stderr, "internal error:");
     
-    } else if (type == REPORT_WARNING) {
+    } else if (type == REPORT_WARNING || type == REPORT_NOTE) {
     
 #ifndef     __PDOS__
         set_console_color (COLOR_WARNING);
 #endif
         
-        fprintf (stderr, "warning:");
+        if (type == REPORT_WARNING) {
+            fprintf (stderr, "warning:");
+        } else {
+            fprintf (stderr, "note:");
+        }
     
     }
     

@@ -10,47 +10,61 @@
 
 #include    "ld.h"
 #include    "lib.h"
+#include    "pe.h"
 #include    "report.h"
 
-#if     defined (_WIN32)
-# define    PATHSEP                     ';'
-#else
-# define    PATHSEP                     ':'
-#endif
+struct options_with_use {
 
-struct ld_option {
-
-    const char *name;
-    int idx, flgs;
+    int (*check_option) (const char *cmd_arg, int argc, char **argv, int *optind, const char **optarg);
+    void (*use_option) (const char *cmd_arg, int idx, const char *optarg);
 
 };
 
-#define     LD_OPTION_NO_ARG            0
-#define     LD_OPTION_HAS_ARG           1
+static struct options_with_use fmt_tbl[] = {
 
-#define     LD_OPTION_NONE              0
-#define     LD_OPTION_ENTRY             1
-#define     LD_OPTION_FORMAT            2
-#define     LD_OPTION_HELP              3
-#define     LD_OPTION_IMPURE            4
-#define     LD_OPTION_MAP               5
-#define     LD_OPTION_OUTFILE           6
-#define     LD_OPTION_PSP               7
-#define     LD_OPTION_SUBSYSTEM         8
+    {   0,                      0               },
+    {   0,                      0               },
+    {   0,                      0               },
+    {   0,                      0               },
+    {   0,                      0               },
+    {   &pe_check_option,       &pe_use_option  }
+
+};
+
+#define     LD_OPTION_IGNORED           0
+#define     LD_OPTION_EMIT_RELOCS       1
+#define     LD_OPTION_ENTRY             2
+#define     LD_OPTION_FORMAT            3
+#define     LD_OPTION_HELP              4
+#define     LD_OPTION_IMAGE_BASE        5
+#define     LD_OPTION_MAP               6
+#define     LD_OPTION_MAP_FILE          7
+#define     LD_OPTION_OUTFILE           8
 
 static struct ld_option opts[] = {
 
-    {   "-N",               LD_OPTION_IMPURE,       LD_OPTION_NO_ARG    },
-    {   "-T",               LD_OPTION_PSP,          LD_OPTION_HAS_ARG   },
+    {   "-M",                   LD_OPTION_MAP,              LD_OPTION_NO_ARG    },
+    {   "-Map",                 LD_OPTION_MAP_FILE,         LD_OPTION_HAS_ARG   },
+    {   "-N",                   LD_OPTION_IGNORED,          LD_OPTION_NO_ARG    },
     
-    {   "-e",               LD_OPTION_ENTRY,        LD_OPTION_HAS_ARG   },
-    {   "-o",               LD_OPTION_OUTFILE,      LD_OPTION_HAS_ARG   },
+    {   "-e",                   LD_OPTION_ENTRY,            LD_OPTION_HAS_ARG   },
+    {   "-o",                   LD_OPTION_OUTFILE,          LD_OPTION_HAS_ARG   },
+    {   "-s",                   LD_OPTION_IGNORED,          LD_OPTION_NO_ARG    },
+    {   "-q",                   LD_OPTION_EMIT_RELOCS,      LD_OPTION_NO_ARG    },
     
-    {   "--oformat",        LD_OPTION_FORMAT,       LD_OPTION_HAS_ARG   },
-    {   "--help",           LD_OPTION_HELP,         LD_OPTION_NO_ARG    },
-    {   "--subsystem",      LD_OPTION_SUBSYSTEM,    LD_OPTION_HAS_ARG   },
     
-    {   0,                  0,                      0                   }
+    {   "--emit_relocs",        LD_OPTION_EMIT_RELOCS,      LD_OPTION_NO_ARG    },
+    {   "--entry",              LD_OPTION_ENTRY,            LD_OPTION_HAS_ARG   },
+    {   "--help",               LD_OPTION_HELP,             LD_OPTION_NO_ARG    },
+    {   "--image_base",         LD_OPTION_IMAGE_BASE,       LD_OPTION_HAS_ARG   },
+    {   "--oformat",            LD_OPTION_FORMAT,           LD_OPTION_HAS_ARG   },
+    {   "--omagic",             LD_OPTION_IGNORED,          LD_OPTION_NO_ARG    },
+    {   "--output",             LD_OPTION_OUTFILE,          LD_OPTION_HAS_ARG   },
+    {   "--print-map",          LD_OPTION_MAP,              LD_OPTION_NO_ARG    },
+    {   "--strip-all",          LD_OPTION_IGNORED,          LD_OPTION_NO_ARG    },
+    
+    
+    {   0,                      0,                          0                   }
 
 };
 
@@ -62,22 +76,206 @@ static void print_usage (void) {
         fprintf (stderr, "Usage: %s [options] file...\n\n", program_name);
         fprintf (stderr, "Options:\n\n");
         
-        fprintf (stderr, "    -N                    Do not page align data.\n");
-        fprintf (stderr, "    -T OFFSET             Offset addresses by the specified offset.\n");
-        
-        fprintf (stderr, "    --oformat FORMAT      Specify the format of output file (default msdos)\n");
-        fprintf (stderr, "                              Supported formats are:\n");
-        fprintf (stderr, "                                  a.out-i386, elks-ia16, elks-i386,\n");
-        fprintf (stderr, "                                  binary, msdos\n");
-        
-        fprintf (stderr, "    -e ADDRESS            Set start address.\n");
-        fprintf (stderr, "    -s                    Ignored.\n");
-        
-        fprintf (stderr, "    -o FILE               Set output file name (default a.out).\n");
-        fprintf (stderr, "    --help                Print this help information.\n");
+        fprintf (stderr, "    -e ADDRESS, --entry ADDRESS       Set start address.\n");
+        fprintf (stderr, "    -q, --emit-relocs                 Generate relocations in final output.\n");
+        fprintf (stderr, "    -s, --strip-all                   Ignored.\n");
         
         fprintf (stderr, "\n");
+        
+        fprintf (stderr, "    -M, --print-map                   Print map file on standard output.\n");
+        fprintf (stderr, "    -N, --omagic                      Ignored.\n");
+        
+        fprintf (stderr, "\n");
+        fprintf (stderr, "    -Map FILE                         Write a linker map to FILE.\n");
+        
+        fprintf (stderr, "\n");
+        
+        fprintf (stderr, "    --help                            Print option help.\n");
+        fprintf (stderr, "    --oformat FORMAT                  Specify the format of output file (default msdos)\n");
+        fprintf (stderr, "                                          Supported formats are:\n");
+        /*fprintf (stderr, "                                              a.out-i386, elks-ia16, elks-i386,\n");*/
+        fprintf (stderr, "                                              pe-i386, binary, msdos\n");
+        fprintf (stderr, "    --image-base <address>            Set base address of the executable.\n");
+        
+        fprintf (stderr, "\n");
+        pe_print_help ();
+        fprintf (stderr, "\n");
     
+    }
+
+}
+
+static void use_option (const char *cmd_arg, int idx, const char *optarg) {
+
+    switch (idx) {
+    
+        case LD_OPTION_IGNORED: {
+        
+            break;
+        
+        }
+        
+        case LD_OPTION_EMIT_RELOCS: {
+        
+            state->emit_relocs = 1;
+            break;
+        
+        }
+        
+        case LD_OPTION_ENTRY: {
+        
+            char *p;
+            state->entry_point = strtoul (optarg, &p, 0);
+            
+            if (p == optarg + strlen (optarg)) {
+                state->entry_symbol_name = "";
+            } else {
+            
+                state->entry_point = 0;
+                state->entry_symbol_name = optarg;
+            
+            }
+            
+            break;
+        
+        }
+        
+        case LD_OPTION_FORMAT: {
+        
+            if (xstrcasecmp (optarg, "binary") == 0) {
+            
+                state->format = LD_FORMAT_BIN;
+                break;
+            
+            }
+            
+            if (xstrcasecmp (optarg, "msdos") == 0) {
+            
+                state->format = LD_FORMAT_COM;
+                break;
+            
+            }
+            
+            /*if (xstrcasecmp (optarg, "elks-ia16") == 0) {
+            
+                state->format = LD_FORMAT_IA16_ELKS;
+                break;
+            
+            }*/
+            
+            /*if (xstrcasecmp (optarg, "elks-i386") == 0) {
+            
+                state->format = LD_FORMAT_I386_ELKS;
+                break;
+            
+            }*/
+            
+            /*if (xstrcasecmp (optarg, "a.out-i386") == 0) {
+            
+                state->format = LD_FORMAT_I386_AOUT;
+                break;
+            
+            }*/
+            
+            if (xstrcasecmp (optarg, "pe-i386") == 0) {
+            
+                state->format = LD_FORMAT_I386_PE;
+                break;
+            
+            }
+            
+            report_at (program_name, 0, REPORT_ERROR, "unrecognised output format '%s'", optarg);
+            exit (EXIT_FAILURE);
+        
+        }
+        
+        case LD_OPTION_HELP: {
+        
+            print_usage ();
+            exit (EXIT_SUCCESS);
+        
+        }
+        
+        case LD_OPTION_IMAGE_BASE: {
+        
+            long conversion;
+            char *temp;
+            
+            errno = 0;
+            conversion = strtol (optarg, &temp, 0);
+            
+            if (!*optarg || isspace ((int) *optarg) || errno || *temp) {
+            
+                report_at (program_name, 0, REPORT_ERROR, "bad number for base address");
+                exit (EXIT_FAILURE);
+            
+            }
+            
+            state->base_address = (unsigned long) conversion;
+            state->use_custom_base_address = 1;
+            
+            break;
+        
+        }
+        
+        case LD_OPTION_MAP: {
+        
+            state->output_map_filename = "";
+            break;
+        
+        }
+        
+        case LD_OPTION_MAP_FILE: {
+        
+            state->output_map_filename = optarg;
+            break;
+        
+        }
+        
+        case LD_OPTION_OUTFILE: {
+        
+            if (state->output_filename) {
+            
+                report_at (program_name, 0, REPORT_ERROR, "multiple output files provided");
+                exit (EXIT_FAILURE);
+            
+            }
+            
+            state->output_filename = optarg;
+            break;
+        
+        }
+        
+        default: {
+        
+            report_at (program_name, 0, REPORT_ERROR, "unsupported option '%s'", cmd_arg);
+            exit (EXIT_FAILURE);
+        
+        }
+    
+    }
+
+}
+
+unsigned long array_to_integer (unsigned char *arr, int size) {
+
+    unsigned long value = 0;
+    int i;
+    
+    for (i = 0; i < size; i++) {
+        value |= arr[i] << (CHAR_BIT * i);
+    }
+    
+    return value;
+
+}
+
+void integer_to_array (unsigned long value, unsigned char *dest, int size) {
+
+    int i;
+    
+    for (i = 0; i < size; i++) {
+        dest[i] = (value >> (CHAR_BIT * i)) & UCHAR_MAX;
     }
 
 }
@@ -166,7 +364,9 @@ void dynarray_add (void *ptab, long *nb_ptr, void *data) {
 
 void parse_args (int argc, char **argv, int optind) {
 
+    struct options_with_use *options_with_use;
     struct ld_option *popt;
+    
     const char *optarg, *r;
     
     if (argc <= optind) {
@@ -176,15 +376,13 @@ void parse_args (int argc, char **argv, int optind) {
     
     }
     
-    state->subsystem = 3;
-    
     while (optind < argc) {
     
         r = argv[optind++];
         
         if (r[0] != '-' || r[1] == '\0') {
         
-            dynarray_add (&state->files, &state->nb_files, xstrdup (r));
+            dynarray_add (&state->input_files, &state->nb_input_files, xstrdup (r));
             continue;
         
         }
@@ -195,10 +393,7 @@ void parse_args (int argc, char **argv, int optind) {
             const char *r1 = r;
             
             if (!p1) {
-            
-                report_at (program_name, 0, REPORT_ERROR, "invalid option -- '%s'", r);
-                exit (EXIT_FAILURE);
-            
+                break;    
             }
             
             if (!strstart (p1, &r1)) {
@@ -230,155 +425,32 @@ void parse_args (int argc, char **argv, int optind) {
         
         }
         
-        switch (popt->idx) {
+        if (popt && popt->name) {
         
-            case LD_OPTION_ENTRY: {
+            use_option (r, popt->idx, optarg);
+            continue;
+        
+        }
+        
+        options_with_use = &fmt_tbl[state->format];
+        
+        if (options_with_use->check_option && options_with_use->use_option) {
+        
+            int idx;
             
-                if (state->entry) {
-                    free (state->entry);
-                }
-                
-                state->entry = xstrdup (optarg);
-                break;
+            if ((idx = options_with_use->check_option (r, argc, argv, &optind, &optarg)) >= 0) {
             
-            }
-            
-            case LD_OPTION_FORMAT: {
-            
-                if (xstrcasecmp (optarg, "binary") == 0) {
-                
-                    state->format = LD_FORMAT_BIN;
-                    break;
-                
-                }
-                
-                if (xstrcasecmp (optarg, "msdos") == 0) {
-                
-                    state->format = LD_FORMAT_COM;
-                    break;
-                
-                }
-                
-                if (xstrcasecmp (optarg, "elks-ia16") == 0) {
-                
-                    state->format = LD_FORMAT_IA16_ELKS;
-                    break;
-                
-                }
-                
-                if (xstrcasecmp (optarg, "elks-i386") == 0) {
-                
-                    state->format = LD_FORMAT_I386_ELKS;
-                    break;
-                
-                }
-                
-                if (xstrcasecmp (optarg, "a.out-i386") == 0) {
-                
-                    state->format = LD_FORMAT_I386_AOUT;
-                    break;
-                
-                }
-                
-                if (xstrcasecmp (optarg, "pe-i386") == 0) {
-                
-                    state->format = LD_FORMAT_I386_PE;
-                    break;
-                
-                }
-                
-                report_at (program_name, 0, REPORT_ERROR, "unrecognised output format '%s'", optarg);
-                exit (EXIT_FAILURE);
-            
-            }
-            
-            case LD_OPTION_HELP: {
-            
-                print_usage ();
-                exit (EXIT_SUCCESS);
-            
-            }
-            
-            case LD_OPTION_IMPURE: {
-            
-                state->impure = 1;
-                break;
-            
-            }
-            
-            case LD_OPTION_OUTFILE: {
-            
-                if (state->ofile) {
-                
-                    report_at (program_name, 0, REPORT_ERROR, "multiple output files provided");
-                    exit (EXIT_FAILURE);
-                
-                }
-                
-                state->ofile = xstrdup (optarg);
-                break;
-            
-            }
-            
-            case LD_OPTION_PSP: {
-            
-                long conversion;
-                char *temp;
-                
-                errno = 0;
-                conversion = strtol (optarg, &temp, 0);
-                
-                if (!*optarg || isspace ((int) *optarg) || errno || *temp) {
-                
-                    report_at (program_name, 0, REPORT_ERROR, "bad number for text start");
-                    exit (EXIT_FAILURE);
-                
-                }
-                
-                if (conversion < 0 || conversion > LONG_MAX) {
-                
-                    report_at (program_name, 0, REPORT_ERROR, "text start must be between 0 and %u", ULONG_MAX);
-                    exit (EXIT_FAILURE);
-                
-                }
-                
-                state->psp = (unsigned long) conversion;
-                break;
-            
-            }
-            
-            case LD_OPTION_SUBSYSTEM: {
-            
-                long conversion;
-                char *temp;
-                
-                errno = 0;
-                conversion = strtol (optarg, &temp, 0);
-                
-                if (!*optarg || isspace ((int) *optarg) || errno || *temp) {
-                
-                    report_at (program_name, 0, REPORT_ERROR, "bad number for subsystem");
-                    exit (EXIT_FAILURE);
-                
-                }
-                
-                state->subsystem = (unsigned long) conversion;
-                break;
-            
-            }
-            
-            default: {
-            
-                report_at (program_name, 0, REPORT_ERROR, "unsupported option '%s'", r);
-                exit (EXIT_FAILURE);
+                options_with_use->use_option (r, idx, optarg);
+                continue;
             
             }
         
         }
+        
+        report_at (program_name, 0, REPORT_ERROR, "invalid option -- '%s'", r);
+        exit (EXIT_FAILURE);
     
     }
-    
-    if (!state->ofile) { state->ofile = "a.out"; }
 
 }
 
