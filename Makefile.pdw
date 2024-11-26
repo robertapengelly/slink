@@ -6,7 +6,7 @@ CC=gccwin
 LD=ldwin
 
 COPTS=-S -O2 -fno-common -ansi -I. -I./include -I../pdos/pdpclib -I../pdos/src -D__WIN32__ -D__NOBIVA__ -D__PDOS__ -Wall -Werror -ansi -m32 -pedantic
-COBJ=elks.c hashtab.o ld.o lib.o link.o map.o pe.o report.o section.o symbol.o vector.o write7x.o
+COBJ=aout.o elks.o hashtab.o ld.o lib.o link.o map.o pe.o report.o section.o symbol.o vector.o write7x.o
 
 all: clean slink.exe
 

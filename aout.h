@@ -45,7 +45,7 @@ struct relocation_info {
 };*/
 
 #define     N_TYPE                      0x1e
-int create_executable_from_aout_objects (void);
+void aout_write (const char *filename);
 
 #define     OMAGIC                      0407
 #define     ZMAGIC                      0413

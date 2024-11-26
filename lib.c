@@ -94,7 +94,7 @@ static void print_usage (void) {
         fprintf (stderr, "    --oformat FORMAT                  Specify the format of output file (default msdos)\n");
         fprintf (stderr, "                                          Supported formats are:\n");
         /*fprintf (stderr, "                                              a.out-i386, elks-ia16, elks-i386,\n");*/
-        fprintf (stderr, "                                              pe-i386, binary, msdos\n");
+        fprintf (stderr, "                                              a.out-i386, pe-i386, binary, msdos\n");
         fprintf (stderr, "    --image-base <address>            Set base address of the executable.\n");
         
         fprintf (stderr, "\n");
@@ -170,12 +170,12 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
             }*/
             
-            /*if (xstrcasecmp (optarg, "a.out-i386") == 0) {
+            if (xstrcasecmp (optarg, "a.out-i386") == 0) {
             
                 state->format = LD_FORMAT_I386_AOUT;
                 break;
             
-            }*/
+            }
             
             if (xstrcasecmp (optarg, "pe-i386") == 0) {
             

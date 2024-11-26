@@ -5,6 +5,7 @@
 #include    <stdlib.h>
 #include    <string.h>
 
+#include    "aout.h"
 #include    "elks.h"
 #include    "ld.h"
 #include    "lib.h"
@@ -193,9 +194,9 @@ int main (int argc, char **argv) {
         free (data);
         fclose (fp);
     
-    }/* else if (state->format == LD_FORMAT_I386_AOUT) {
+    } else if (state->format == LD_FORMAT_I386_AOUT) {
         aout_write (state->output_filename);
-    } else if (state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS) {
+    }/* else if (state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS) {
         elks_write (state->output_filename);
     }*/ else if (state->format == LD_FORMAT_I386_PE) {
     
