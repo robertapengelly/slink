@@ -194,12 +194,12 @@ struct pe_import_directory_table {
 
 int pe_check_option (const char *cmd_arg, int argc, char **argv, int *optind, const char **optarg);
 
+unsigned long pe_align_to_file_alignment (unsigned long value);
+unsigned long pe_get_first_section_rva (void);
+
 void pe_after_link (void);
 void pe_before_link (void);
 void pe_print_help (void);
-
-unsigned long pe_align_to_file_alignment (unsigned long value);
-unsigned long pe_get_first_section_rva (void);
 
 void pe_write (const char *filename);
 void pe_use_option (const char *cmd_arg, int idx, const char *optarg);

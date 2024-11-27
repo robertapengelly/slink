@@ -386,6 +386,16 @@ static void calculate_entry_point (void) {
 
 }
 
+static unsigned long align_section_if_needed (unsigned long value) {
+
+    if (state->format == LD_FORMAT_I386_PE) {
+        return pe_align_to_file_alignment (value);
+    }
+    
+    return value;
+
+}
+
 void link (void) {
 
     struct section *section;
@@ -400,13 +410,7 @@ void link (void) {
     if ((symbol = symbol_find ("__edata")) && symbol_is_undefined (symbol)) {
     
         if ((section = section_find (".text"))) {
-        
-            if (state->format == LD_FORMAT_I386_PE) {
-                value += pe_align_to_file_alignment (section->total_size);
-            } else {
-                value += section->total_size;
-            }
-        
+            value += align_section_if_needed (section->total_size);
         }
         
         of = object_file_make (FAKE_LD_FILENAME, 1);
@@ -426,23 +430,11 @@ void link (void) {
     if ((symbol = symbol_find ("__end")) && symbol_is_undefined (symbol)) {
     
         if ((section = section_find (".data"))) {
-        
-            if (state->format == LD_FORMAT_I386_PE) {
-                value += pe_align_to_file_alignment (section->total_size);
-            } else {
-                value += section->total_size;
-            }
-        
+            value += align_section_if_needed (section->total_size);
         }
         
         if ((section = section_find (".bss"))) {
-        
-            if (state->format == LD_FORMAT_I386_PE) {
-                value += pe_align_to_file_alignment (section->total_size);
-            } else {
-                value += section->total_size;
-            }
-        
+            value += align_section_if_needed (section->total_size);
         }
         
         of = object_file_make (FAKE_LD_FILENAME, 1);
