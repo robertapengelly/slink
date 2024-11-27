@@ -870,3 +870,7 @@ void pe_print_help (void) {
 unsigned long pe_get_first_section_rva (void) {
     return ALIGN (state->size_of_headers, section_alignment);
 }
+
+unsigned long pe_align_to_file_alignment (unsigned long value) {
+    return ALIGN (value, file_alignment);
+}

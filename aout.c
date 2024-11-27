@@ -66,7 +66,13 @@ static unsigned char *write_relocs_for_section (unsigned char *pos, struct secti
             symbol = part->reloc_arr[i].symbol;
             
             if (symbol_is_undefined (symbol)) {
+            
                 symbol = symbol_find (symbol->name);
+                
+                if (strcmp (symbol->name, "__edata") == 0 || strcmp (symbol->name, "__end") == 0) {
+                    continue;
+                }
+            
             }
             
             integer_to_array (part->rva - part->section->rva + part->reloc_arr[i].offset, rel.r_address, 4);

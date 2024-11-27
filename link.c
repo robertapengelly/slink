@@ -397,12 +397,15 @@ void link (void) {
     collapse_subsections ();
     calculate_section_sizes_and_rvas ();
     
-    if (!(symbol = symbol_find ("__edata")) || symbol_is_undefined (symbol)) {
+    if ((symbol = symbol_find ("__edata")) && symbol_is_undefined (symbol)) {
     
         if ((section = section_find (".text"))) {
         
-            value += (/*section->rva + */section->total_size);
-            /*value -= state->size_of_headers;*/
+            if (state->format == LD_FORMAT_I386_PE) {
+                value += pe_align_to_file_alignment (section->total_size);
+            } else {
+                value += section->total_size;
+            }
         
         }
         
@@ -415,18 +418,31 @@ void link (void) {
         symbol->value = value / 16;
         
         symbol_record_external_symbol (symbol);
-        value %= 16;
     
     }
     
-    if (!(symbol = symbol_find ("__end")) || symbol_is_undefined (symbol)) {
+    value %= 16;
+    
+    if ((symbol = symbol_find ("__end")) && symbol_is_undefined (symbol)) {
     
         if ((section = section_find (".data"))) {
-            value += section->total_size;
+        
+            if (state->format == LD_FORMAT_I386_PE) {
+                value += pe_align_to_file_alignment (section->total_size);
+            } else {
+                value += section->total_size;
+            }
+        
         }
         
         if ((section = section_find (".bss"))) {
-            value += section->total_size;
+        
+            if (state->format == LD_FORMAT_I386_PE) {
+                value += pe_align_to_file_alignment (section->total_size);
+            } else {
+                value += section->total_size;
+            }
+        
         }
         
         of = object_file_make (FAKE_LD_FILENAME, 1);
