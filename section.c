@@ -140,8 +140,12 @@ void section_write (struct section *section, unsigned char *memory) {
     
     for (part = section->first_part; part; part = part->next) {
     
-        memcpy (memory, part->content, part->content_size);
-        memory += part->content_size;
+        if (part->content_size > 0) {
+        
+            memcpy (memory, part->content, part->content_size);
+            memory += part->content_size;
+        
+        }
     
     }
 

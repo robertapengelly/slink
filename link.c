@@ -2,6 +2,8 @@
  * @file            link.c
  *****************************************************************************/
 #include    <limits.h>
+#include    <stdio.h>
+#include    <stdlib.h>
 #include    <string.h>
 
 #include    "ld.h"
@@ -29,6 +31,168 @@ struct reloc_howto reloc_howtos[RELOC_TYPE_END] = {
     {   1,  1,  0,  0,  0,  "RELOC_TYPE_PC8",       0,  0   }
 
 };
+
+static void output_symbols () {
+
+    struct section *section = section_find_or_make (".data");
+    
+    struct object_file *of;
+    struct symbol *symbol;
+    
+    struct section_part *part = section_part_new (section, 0);
+    unsigned long pos = 0, i;
+    
+    for (of = all_object_files; of; of = of->next) {
+    
+        for (i = 0; i < of->symbol_cnt; i++) {
+        
+            symbol = of->symbol_arr + i;
+            
+            if (symbol->auxiliary || symbol_is_undefined (symbol) || (symbol->flags & SYMBOL_FLAG_SECTION_SYMBOL) || !symbol->name) {
+                continue;
+            }
+            
+            if (!(symbol = symbol_find (symbol->name))) {
+                continue;
+            }
+            
+            part->content_size += (strlen (symbol->name) + 1);
+        
+        }
+    
+    }
+    
+    if (!part->content_size) {
+    
+        free (part);
+        return;
+    
+    }
+    
+    part->content = xmalloc (part->content_size);
+    
+    for (of = all_object_files; of; of = of->next) {
+    
+        for (i = 0; i < of->symbol_cnt; i++) {
+        
+            symbol = of->symbol_arr + i;
+            
+            if (symbol->auxiliary || symbol_is_undefined (symbol) || (symbol->flags & SYMBOL_FLAG_SECTION_SYMBOL) || !symbol->name) {
+                continue;
+            }
+            
+            if (!(symbol = symbol_find (symbol->name))) {
+                continue;
+            }
+            
+            pos += (sprintf ((char *) part->content + pos, "%s", symbol->name) + 1);
+        
+        }
+    
+    }
+    
+    section_append_section_part (section, part);
+
+}
+
+static void generate_symbols_table (unsigned long offset) {
+
+    struct section *section = section_find_or_make (".data");
+    
+    struct object_file *of;
+    struct symbol *symbol;
+    
+    struct section_part *part = section_part_new (section, 0);
+    unsigned long pos = 0, i;
+    
+    for (of = all_object_files; of; of = of->next) {
+    
+        for (i = 0; i < of->symbol_cnt; i++) {
+        
+            symbol = of->symbol_arr + i;
+            
+            if (symbol->auxiliary || symbol_is_undefined (symbol) || (symbol->flags & SYMBOL_FLAG_SECTION_SYMBOL) || !symbol->name) {
+                continue;
+            }
+            
+            if (!(symbol = symbol_find (symbol->name))) {
+                continue;
+            }
+            
+            part->content_size += 8;
+        
+        }
+    
+    }
+    
+    if (!part->content_size) {
+
+        free (part);
+        return;
+
+    }
+    
+    if ((symbol = symbol_find ("__symbol_table_start")) && symbol_is_undefined (symbol)) {
+    
+        of = object_file_make (FAKE_LD_FILENAME, 1);
+        
+        symbol = of->symbol_arr;
+        symbol->name = xstrdup ("__symbol_table_start");
+        
+        symbol->section_number = ABSOLUTE_SECTION_NUMBER;
+        symbol->value = offset;
+        
+        symbol_record_external_symbol (symbol);
+    
+    }
+    
+    part->content = xmalloc (part->content_size);
+    
+    if ((symbol = symbol_find ("__symbol_table_end")) && symbol_is_undefined (symbol)) {
+    
+        of = object_file_make (FAKE_LD_FILENAME, 1);
+        
+        symbol = of->symbol_arr;
+        symbol->name = xstrdup ("__symbol_table_end");
+        
+        symbol->section_number = ABSOLUTE_SECTION_NUMBER;
+        symbol->value = offset + part->content_size;
+        
+        symbol_record_external_symbol (symbol);
+    
+    }
+    
+    section->total_size += part->content_size;
+    
+    for (of = all_object_files; of; of = of->next) {
+    
+        for (i = 0; i < of->symbol_cnt; i++) {
+        
+            symbol = of->symbol_arr + i;
+            
+            if (symbol->auxiliary || symbol_is_undefined (symbol) || (symbol->flags & SYMBOL_FLAG_SECTION_SYMBOL) || !symbol->name) {
+                continue;
+            }
+            
+            if (!(symbol = symbol_find (symbol->name))) {
+                continue;
+            }
+            
+            integer_to_array (symbol_get_value_no_base (symbol), part->content + pos, 4);
+            pos += 4;
+            
+            integer_to_array (offset, part->content + pos, 4);
+            pos += 4;
+            
+            offset += strlen (symbol->name) + 1;
+        
+        }
+    
+    }
+    
+    section_append_section_part (section, part);
+
+}
 
 static void check_unresolved (void) {
 
@@ -398,14 +562,37 @@ static unsigned long align_section_if_needed (unsigned long value) {
 
 void link (void) {
 
+    unsigned long value = 0, offset = 0;
+    
     struct section *section;
-    unsigned long value = 0;
+    struct section_part *part;
     
     struct object_file *of;
     struct symbol *symbol;
     
     collapse_subsections ();
+    
+    if (state->generate_symbols_table) {
+        output_symbols ();
+    }
+    
     calculate_section_sizes_and_rvas ();
+    
+    if (state->generate_symbols_table) {
+    
+        if ((section = section_find (".data"))) {
+        
+            offset += (section->rva % 16);
+            
+            for (part = section->first_part; part; part = part->next) {
+                offset += part->content_size;
+            }
+            
+            generate_symbols_table (offset);
+        
+        }
+    
+    }
     
     if ((symbol = symbol_find ("__edata")) && symbol_is_undefined (symbol)) {
     
@@ -443,7 +630,7 @@ void link (void) {
         symbol->name = xstrdup ("__end");
         
         symbol->section_number = ABSOLUTE_SECTION_NUMBER;
-        symbol->value = value % 16;
+        symbol->value = value/* % 16*/;
         
         symbol_record_external_symbol (symbol);
     

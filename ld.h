@@ -22,6 +22,8 @@ struct ld_state {
     
     int emit_relocs, use_custom_base_address;
     unsigned long size_of_headers;
+    
+    int generate_symbols_table;
 
 };
 

@@ -31,40 +31,42 @@ static struct options_with_use fmt_tbl[] = {
 
 };
 
-#define     LD_OPTION_IGNORED           0
-#define     LD_OPTION_EMIT_RELOCS       1
-#define     LD_OPTION_ENTRY             2
-#define     LD_OPTION_FORMAT            3
-#define     LD_OPTION_HELP              4
-#define     LD_OPTION_IMAGE_BASE        5
-#define     LD_OPTION_MAP               6
-#define     LD_OPTION_MAP_FILE          7
-#define     LD_OPTION_OUTFILE           8
+#define     LD_OPTION_IGNORED                               0
+#define     LD_OPTION_EMIT_RELOCS                           1
+#define     LD_OPTION_ENTRY                                 2
+#define     LD_OPTION_FORMAT                                3
+#define     LD_OPTION_GENERATE_SYMBOLS_TABLE                4
+#define     LD_OPTION_HELP                                  5
+#define     LD_OPTION_IMAGE_BASE                            6
+#define     LD_OPTION_MAP                                   7
+#define     LD_OPTION_MAP_FILE                              8
+#define     LD_OPTION_OUTFILE                               9
 
 static struct ld_option opts[] = {
 
-    {   "-M",                   LD_OPTION_MAP,              LD_OPTION_NO_ARG    },
-    {   "-Map",                 LD_OPTION_MAP_FILE,         LD_OPTION_HAS_ARG   },
-    {   "-N",                   LD_OPTION_IGNORED,          LD_OPTION_NO_ARG    },
+    {   "-M",                           LD_OPTION_MAP,                          LD_OPTION_NO_ARG    },
+    {   "-Map",                         LD_OPTION_MAP_FILE,                     LD_OPTION_HAS_ARG   },
+    {   "-N",                           LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
     
-    {   "-e",                   LD_OPTION_ENTRY,            LD_OPTION_HAS_ARG   },
-    {   "-o",                   LD_OPTION_OUTFILE,          LD_OPTION_HAS_ARG   },
-    {   "-s",                   LD_OPTION_IGNORED,          LD_OPTION_NO_ARG    },
-    {   "-q",                   LD_OPTION_EMIT_RELOCS,      LD_OPTION_NO_ARG    },
-    
-    
-    {   "--emit_relocs",        LD_OPTION_EMIT_RELOCS,      LD_OPTION_NO_ARG    },
-    {   "--entry",              LD_OPTION_ENTRY,            LD_OPTION_HAS_ARG   },
-    {   "--help",               LD_OPTION_HELP,             LD_OPTION_NO_ARG    },
-    {   "--image_base",         LD_OPTION_IMAGE_BASE,       LD_OPTION_HAS_ARG   },
-    {   "--oformat",            LD_OPTION_FORMAT,           LD_OPTION_HAS_ARG   },
-    {   "--omagic",             LD_OPTION_IGNORED,          LD_OPTION_NO_ARG    },
-    {   "--output",             LD_OPTION_OUTFILE,          LD_OPTION_HAS_ARG   },
-    {   "--print-map",          LD_OPTION_MAP,              LD_OPTION_NO_ARG    },
-    {   "--strip-all",          LD_OPTION_IGNORED,          LD_OPTION_NO_ARG    },
+    {   "-e",                           LD_OPTION_ENTRY,                        LD_OPTION_HAS_ARG   },
+    {   "-o",                           LD_OPTION_OUTFILE,                      LD_OPTION_HAS_ARG   },
+    {   "-s",                           LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
+    {   "-q",                           LD_OPTION_EMIT_RELOCS,                  LD_OPTION_NO_ARG    },
     
     
-    {   0,                      0,                          0                   }
+    {   "--emit-relocs",                LD_OPTION_EMIT_RELOCS,                  LD_OPTION_NO_ARG    },
+    {   "--entry",                      LD_OPTION_ENTRY,                        LD_OPTION_HAS_ARG   },
+    {   "--help",                       LD_OPTION_HELP,                         LD_OPTION_NO_ARG    },
+    {   "--image-base",                 LD_OPTION_IMAGE_BASE,                   LD_OPTION_HAS_ARG   },
+    {   "--oformat",                    LD_OPTION_FORMAT,                       LD_OPTION_HAS_ARG   },
+    {   "--omagic",                     LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
+    {   "--output",                     LD_OPTION_OUTFILE,                      LD_OPTION_HAS_ARG   },
+    {   "--print-map",                  LD_OPTION_MAP,                          LD_OPTION_NO_ARG    },
+    {   "--strip-all",                  LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
+    
+    
+    {   "--generate-symbols-table",     LD_OPTION_GENERATE_SYMBOLS_TABLE,       LD_OPTION_NO_ARG    },
+    {   0,                              0,                                      0                   }
 
 };
 
@@ -90,6 +92,7 @@ static void print_usage (void) {
         
         fprintf (stderr, "\n");
         
+        fprintf (stderr, "    --generate-symbols-table          Generate a symbols table from global symbols.\n");
         fprintf (stderr, "    --help                            Print option help.\n");
         fprintf (stderr, "    --oformat FORMAT                  Specify the format of output file (default msdos)\n");
         fprintf (stderr, "                                          Supported formats are:\n");
@@ -186,6 +189,13 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
             report_at (program_name, 0, REPORT_ERROR, "unrecognised output format '%s'", optarg);
             exit (EXIT_FAILURE);
+        
+        }
+        
+        case LD_OPTION_GENERATE_SYMBOLS_TABLE: {
+        
+            state->generate_symbols_table = 1;
+            break;
         
         }
         
