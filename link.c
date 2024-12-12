@@ -95,7 +95,7 @@ static void output_symbols () {
 
 }
 
-static void generate_symbols_table (unsigned long offset) {
+static unsigned long generate_symbols_table (unsigned long offset) {
 
     struct section *section = section_find_or_make (".data");
     
@@ -128,41 +128,11 @@ static void generate_symbols_table (unsigned long offset) {
     if (!part->content_size) {
 
         free (part);
-        return;
+        return 0;
 
     }
     
-    if ((symbol = symbol_find ("__symbol_table_start")) && symbol_is_undefined (symbol)) {
-    
-        of = object_file_make (FAKE_LD_FILENAME, 1);
-        
-        symbol = of->symbol_arr;
-        symbol->name = xstrdup ("__symbol_table_start");
-        
-        symbol->section_number = ABSOLUTE_SECTION_NUMBER;
-        symbol->value = offset;
-        
-        symbol_record_external_symbol (symbol);
-    
-    }
-    
     part->content = xmalloc (part->content_size);
-    
-    if ((symbol = symbol_find ("__symbol_table_end")) && symbol_is_undefined (symbol)) {
-    
-        of = object_file_make (FAKE_LD_FILENAME, 1);
-        
-        symbol = of->symbol_arr;
-        symbol->name = xstrdup ("__symbol_table_end");
-        
-        symbol->section_number = ABSOLUTE_SECTION_NUMBER;
-        symbol->value = offset + part->content_size;
-        
-        symbol_record_external_symbol (symbol);
-    
-    }
-    
-    section->total_size += part->content_size;
     
     for (of = all_object_files; of; of = of->next) {
     
@@ -191,6 +161,7 @@ static void generate_symbols_table (unsigned long offset) {
     }
     
     section_append_section_part (section, part);
+    return part->content_size;
 
 }
 
@@ -588,7 +559,36 @@ void link (void) {
                 offset += part->content_size;
             }
             
-            generate_symbols_table (offset);
+            if ((symbol = symbol_find ("__symbol_table_start")) && symbol_is_undefined (symbol)) {
+            
+                of = object_file_make (FAKE_LD_FILENAME, 1);
+                
+                symbol = of->symbol_arr;
+                symbol->name = xstrdup ("__symbol_table_start");
+                
+                symbol->section_number = ABSOLUTE_SECTION_NUMBER;
+                symbol->value = offset;
+                
+                symbol_record_external_symbol (symbol);
+            
+            }
+            
+            offset += generate_symbols_table (offset);
+            calculate_section_sizes_and_rvas ();
+            
+            if ((symbol = symbol_find ("__symbol_table_end")) && symbol_is_undefined (symbol)) {
+            
+                of = object_file_make (FAKE_LD_FILENAME, 1);
+                
+                symbol = of->symbol_arr;
+                symbol->name = xstrdup ("__symbol_table_end");
+                
+                symbol->section_number = ABSOLUTE_SECTION_NUMBER;
+                symbol->value = offset;
+                
+                symbol_record_external_symbol (symbol);
+            
+            }
         
         }
     
