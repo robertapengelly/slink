@@ -554,9 +554,16 @@ void link (void) {
         if ((section = section_find (".data"))) {
         
             offset += (section->rva % 16);
+            value += (section->rva % 16);
             
             for (part = section->first_part; part; part = part->next) {
-                offset += part->content_size;
+            
+                if (part->next) {
+                    offset += part->content_size;
+                }
+                
+                value += part->content_size;
+            
             }
             
             if ((symbol = symbol_find ("__symbol_table_start")) && symbol_is_undefined (symbol)) {
@@ -567,13 +574,13 @@ void link (void) {
                 symbol->name = xstrdup ("__symbol_table_start");
                 
                 symbol->section_number = ABSOLUTE_SECTION_NUMBER;
-                symbol->value = offset;
+                symbol->value = value;
                 
                 symbol_record_external_symbol (symbol);
             
             }
             
-            offset += generate_symbols_table (offset);
+            value += generate_symbols_table (offset);
             calculate_section_sizes_and_rvas ();
             
             if ((symbol = symbol_find ("__symbol_table_end")) && symbol_is_undefined (symbol)) {
@@ -584,7 +591,7 @@ void link (void) {
                 symbol->name = xstrdup ("__symbol_table_end");
                 
                 symbol->section_number = ABSOLUTE_SECTION_NUMBER;
-                symbol->value = offset;
+                symbol->value = value;
                 
                 symbol_record_external_symbol (symbol);
             
@@ -593,6 +600,8 @@ void link (void) {
         }
     
     }
+    
+    value = 0;
     
     if ((symbol = symbol_find ("__edata")) && symbol_is_undefined (symbol)) {
     
