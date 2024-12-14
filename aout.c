@@ -69,7 +69,7 @@ static unsigned char *write_relocs_for_section (unsigned char *pos, struct secti
             
                 symbol = symbol_find (symbol->name);
                 
-                if (strcmp (symbol->name, "__edata") == 0 || strcmp (symbol->name, "__end") == 0) {
+                if (strcmp (symbol->name, "__etext") == 0 || strcmp (symbol->name, "__edata") == 0 || strcmp (symbol->name, "__end") == 0) {
                     continue;
                 }
             
