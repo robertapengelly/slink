@@ -603,10 +603,30 @@ void link (void) {
     
     value = 0;
     
-    if ((symbol = symbol_find ("__edata")) && symbol_is_undefined (symbol)) {
+    if ((symbol = symbol_find ("__etext")) && symbol_is_undefined (symbol)) {
     
         if ((section = section_find (".text"))) {
-            value += align_section_if_needed (section->total_size);
+            value = align_section_if_needed (section->total_size);
+        }
+        
+        of = object_file_make (FAKE_LD_FILENAME, 1);
+        
+        symbol = of->symbol_arr;
+        symbol->name = xstrdup ("__etext");
+        
+        symbol->section_number = ABSOLUTE_SECTION_NUMBER;
+        symbol->value = value;
+        
+        symbol_record_external_symbol (symbol);
+    
+    }
+    
+    value = 0;
+    
+    if ((symbol = symbol_find ("__edata")) && symbol_is_undefined (symbol)) {
+    
+        if ((section = section_find (".data"))) {
+            value = align_section_if_needed (section->total_size);
         }
         
         of = object_file_make (FAKE_LD_FILENAME, 1);
@@ -615,22 +635,18 @@ void link (void) {
         symbol->name = xstrdup ("__edata");
         
         symbol->section_number = ABSOLUTE_SECTION_NUMBER;
-        symbol->value = value / 16;
+        symbol->value = value;
         
         symbol_record_external_symbol (symbol);
     
     }
     
-    value %= 16;
+    value = 0;
     
     if ((symbol = symbol_find ("__end")) && symbol_is_undefined (symbol)) {
     
-        if ((section = section_find (".data"))) {
-            value += align_section_if_needed (section->total_size);
-        }
-        
         if ((section = section_find (".bss"))) {
-            value += align_section_if_needed (section->total_size);
+            value = align_section_if_needed (section->total_size);
         }
         
         of = object_file_make (FAKE_LD_FILENAME, 1);
@@ -639,7 +655,7 @@ void link (void) {
         symbol->name = xstrdup ("__end");
         
         symbol->section_number = ABSOLUTE_SECTION_NUMBER;
-        symbol->value = value/* % 16*/;
+        symbol->value = value;
         
         symbol_record_external_symbol (symbol);
     
