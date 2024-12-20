@@ -98,10 +98,12 @@ static struct hashtab_entry *find_entry (struct hashtab_entry *entries, unsigned
 static unsigned int hash_string (const void *p, unsigned int length) {
 
     unsigned char *str = (unsigned char *) p;
-    unsigned int i, result = 0;
+    unsigned int i;
+    
+    unsigned int result = 0;
     
     for (i = 0; i < length; i++) {
-        result = (((unsigned int) str[i]) << 12) + (result >> 6) + result + (result >> 3) + (((unsigned int) str[i]) << 8) - result;
+        result = (((unsigned short) str[i]) << 4) + (result >> 9) + result + (result >> 3) + (((unsigned short) str[i]) << 2) - (result << 24);
     }
     
     return result;
