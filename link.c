@@ -32,7 +32,7 @@ struct reloc_howto reloc_howtos[RELOC_TYPE_END] = {
 
 };
 
-static void output_symbols () {
+static void output_symbols (void) {
 
     struct section *section = section_find_or_make (".data");
     
