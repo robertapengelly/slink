@@ -6,6 +6,7 @@
 #include    <stdlib.h>
 #include    <string.h>
 
+#include    "elks.h"
 #include    "ld.h"
 #include    "lib.h"
 #include    "pe.h"
@@ -31,6 +32,19 @@ struct reloc_howto reloc_howtos[RELOC_TYPE_END] = {
     {   1,  1,  0,  0,  0,  "RELOC_TYPE_PC8",       0,  0   }
 
 };
+
+static unsigned long dgroup_start = 0;
+static int has_dgroup = 0;
+
+static unsigned long align_section_if_needed (unsigned long value) {
+
+    if (state->format == LD_FORMAT_I386_PE) {
+        return pe_align_to_file_alignment (value);
+    }
+    
+    return value;
+
+}
 
 static void output_symbols (void) {
 
@@ -277,41 +291,44 @@ static void calculate_section_sizes_and_rvas (void) {
 
 static void reloc_generic (struct section_part *part, struct reloc_entry *rel, struct symbol *symbol) {
 
-    unsigned long result = 0;
+    unsigned char opcode = (part->content + rel->offset - 1)[0];
+    unsigned int size = rel->howto->size;
     
-    switch (rel->howto->size) {
+    unsigned long result = 0, offset = rel->offset;
+    
+    switch (size) {
     
         case 8: {
         
-            result = array_to_integer (part->content + rel->offset, 8);
+            result = array_to_integer (part->content + offset, 8);
             break;
         
         }
         
         case 4: {
         
-            result = array_to_integer (part->content + rel->offset, 4);
+            result = array_to_integer (part->content + offset, 4);
             break;
         
         }
         
         case 3: {
         
-            result = array_to_integer (part->content + rel->offset, 3);
+            result = array_to_integer (part->content + offset, 3);
             break;
         
         }
         
         case 2: {
         
-            result = array_to_integer (part->content + rel->offset, 2);
+            result = array_to_integer (part->content + offset, 2);
             break;
         
         }
         
         case 1: {
         
-            result = array_to_integer (part->content + rel->offset, 1);
+            result = array_to_integer (part->content + offset, 1);
             break;
         
         }
@@ -333,57 +350,155 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
         
         if (rel->howto->pc_rel) {
         
-            result -= (part->rva + rel->offset);
-            result -= rel->howto->size;
+            result -= (part->rva + offset);
+            result -= size;
         
         }
     
     } else {
+    
         result += symbol_get_value_with_base (symbol);
+        
+        if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
+        
+            if (!((rel->symbolnum >> 31) & 1)/* || (symbol->n_type & N_TYPE) == N_BSS || (symbol->n_type & N_TYPE) == N_DATA || (symbol->n_type & N_TYPE) == N_TEXT*/) {
+            
+                /*report_at (__FILE__, __LINE__, REPORT_FATAL_ERROR, "symbol: %s, %lx", symbol->name, ((rel->symbolnum) >> 28));*/
+                
+                if (((rel->symbolnum >> 27) & 1) || (((rel->symbolnum) >> 28) & 0xff) != N_ABS) {
+                    report_at (program_name, 0, REPORT_ERROR, "%s:(%s+%#lu): segment relocation", part->of->filename, part->section->name, offset);
+                }
+            
+            }
+        
+        }
+        
+        if (xstrcasecmp (symbol->name, "__etext") == 0 || xstrcasecmp (symbol->name, "__edata") == 0 || xstrcasecmp (symbol->name, "__end") == 0) {
+        
+            if (rel->howto == &reloc_howtos[RELOC_TYPE_64]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_PC64];
+            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_32]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_PC32];
+            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_16]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_PC16];
+            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_8]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_PC8];
+            }
+        
+        }
+    
     }
     
-    if ((unsigned long) rel->howto->size < sizeof (result)) {
+    if ((unsigned long) size < sizeof (result)) {
     
-        unsigned long mask = (((unsigned long) 1) << (CHAR_BIT * rel->howto->size)) - 1;
+        unsigned long mask = (((unsigned long) 1) << (CHAR_BIT * size)) - 1;
         result &= mask;
     
     }
     
     result >>= rel->howto->final_right_shift;
     
-    switch (rel->howto->size) {
+    if (!rel->howto->pc_rel && !rel->howto->no_base) {
+    
+        if (has_dgroup) {
+        
+            if (xstrcasecmp (symbol->name, "__etext") != 0 && xstrcasecmp (symbol->name, "__edata") != 0 && xstrcasecmp (symbol->name, "__end") != 0) {
+            
+                if (result >= dgroup_start) {
+                    result -= (dgroup_start & 0xfffffff0);
+                }
+            
+            }
+        
+        }
+    
+    }
+    
+    if (opcode == 0xff) {
+    
+        if (result >= 65535) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "%s:(%s+%#lu): call exceeds 65535 bytes", part->of->filename, part->section->name, offset);
+            
+            if (rel->howto == &reloc_howtos[RELOC_TYPE_PC64]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_64];
+            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC32]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_32];
+            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC16]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_16];
+            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC8]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_8];
+            }
+            
+            result = (((unsigned long) result / 16) << 16) | (unsigned long) result % 16;
+        
+        } else {
+        
+            unsigned char *p = part->content + offset;
+            
+            if (rel->howto == &reloc_howtos[RELOC_TYPE_64]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_PC64];
+            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_32]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_PC32];
+            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_16]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_PC16];
+            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_8]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_PC8];
+            }
+            
+            *(p - 1) = 0x0E;
+            *(p + 0) = 0xE8;
+            *(p + 3) = 0x90;
+            
+            result -= part->rva + rel->offset;
+            
+            while (size > 2) {
+            
+                result--;
+                size--;
+            
+            }
+            
+            offset++;
+            result--;
+        
+        }
+    
+    }
+    
+    switch (size) {
     
         case 8: {
         
-            integer_to_array (result, part->content + rel->offset, 8);
+            integer_to_array (result, part->content + offset, 8);
             break;
         
         }
         
         case 4: {
         
-            integer_to_array (result, part->content + rel->offset, 4);
+            integer_to_array (result, part->content + offset, 4);
             break;
         
         }
         
         case 3: {
         
-            integer_to_array (result, part->content + rel->offset, 3);
+            integer_to_array (result, part->content + offset, 3);
             break;
         
         }
         
         case 2: {
         
-            integer_to_array (result, part->content + rel->offset, 2);
+            integer_to_array (result, part->content + offset, 2);
             break;
         
         }
         
         case 1: {
         
-            integer_to_array (result, part->content + rel->offset, 1);
+            integer_to_array (result, part->content + offset, 1);
             break;
         
         }
@@ -521,16 +636,6 @@ static void calculate_entry_point (void) {
 
 }
 
-static unsigned long align_section_if_needed (unsigned long value) {
-
-    if (state->format == LD_FORMAT_I386_PE) {
-        return pe_align_to_file_alignment (value);
-    }
-    
-    return value;
-
-}
-
 void link (void) {
 
     unsigned long value = 0, offset = 0;
@@ -598,6 +703,29 @@ void link (void) {
             }
         
         }
+    
+    }
+    
+    value = 0;
+    
+    if ((symbol = symbol_find ("DGROUP")) && symbol_is_undefined (symbol)) {
+    
+        if ((section = section_find (".text"))) {
+            value = align_section_if_needed (section->total_size);
+        }
+        
+        dgroup_start = value;
+        has_dgroup = 1;
+        
+        of = object_file_make (FAKE_LD_FILENAME, 1);
+        
+        symbol = of->symbol_arr;
+        symbol->name = xstrdup ("DGROUP");
+        
+        symbol->section_number = ABSOLUTE_SECTION_NUMBER;
+        symbol->value = value / 16;
+        
+        symbol_record_external_symbol (symbol);
     
     }
     

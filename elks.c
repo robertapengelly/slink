@@ -1,6 +1,8 @@
 /******************************************************************************
  * @file            elks.c
  *****************************************************************************/
+#include    <stdio.h>
+#include    <stdlib.h>
 #include    <string.h>
 
 #include    "elks.h"
@@ -11,7 +13,7 @@
 #include    "section.h"
 #include    "symbol.h"
 
-static void translate_relocation (const char *filename, struct reloc_entry *reloc, struct elks_relocation_info *input_reloc, struct section_part *part, struct elks_exec *exec_p) {
+static void translate_relocation (struct reloc_entry *reloc, struct elks_relocation_info *input_reloc, struct section_part *part, struct elks_exec *exec_p) {
 
     unsigned long r_symbolnum = array_to_integer (input_reloc->r_symbolnum, 4);
     
@@ -19,17 +21,15 @@ static void translate_relocation (const char *filename, struct reloc_entry *relo
     long symbolnum = (r_symbolnum & 0x7ffffff);
     
     if ((r_symbolnum >> 31) & 1) {      /* ext */
+    
         reloc->symbol = part->of->symbol_arr + symbolnum;
+        
+        if (xstrcasecmp (reloc->symbol->name, "DGROUP") == 0) {
+            r_symbolnum &= ~(1LU << 31);
+        }
+    
     } else {
     
-        if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
-        
-            if ((((r_symbolnum & (3 << 29)) >> 28) & 0xff) != N_ABS) {
-                report_at (program_name, 0, REPORT_ERROR, "%s: segment relocation at %04x:%04x", filename, r_address / 0xffff, r_address % 0xffff);
-            }
-        
-        }
-        
         if (symbolnum == N_TEXT) {
             reloc->symbol = part->of->symbol_arr + part->of->symbol_cnt - 3;
         } else if (symbolnum == N_DATA) {
@@ -51,6 +51,7 @@ static void translate_relocation (const char *filename, struct reloc_entry *relo
     
     }
     
+    reloc->symbolnum = r_symbolnum;
     reloc->offset = r_address;
     
     switch (1U << ((r_symbolnum >> 29) & 3)) {
@@ -246,6 +247,7 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
         
         symbol->value = array_to_integer (elks_nlist->n_value, 4);
         symbol->size = 0;
+        symbol->n_type = elks_nlist->n_type;
         
         if ((elks_nlist->n_type & N_TYPE) == N_UNDF || (elks_nlist->n_type & N_TYPE) == N_COMM) {
         
@@ -340,7 +342,7 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
     for (i = 0; i < part->reloc_cnt; i++) {
     
         reloc_info = (struct elks_relocation_info *) (pos + (sizeof (*reloc_info) * i));
-        translate_relocation (filename, part->reloc_arr + i, reloc_info, part, elks_exec);
+        translate_relocation (part->reloc_arr + i, reloc_info, part, elks_exec);
     
     }
     
@@ -353,8 +355,200 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
     for (i = 0; i < part->reloc_cnt; i++) {
     
         reloc_info = (struct elks_relocation_info *) (pos + (sizeof (*reloc_info) * i));
-        translate_relocation (filename, part->reloc_arr + i, reloc_info, part, elks_exec);
+        translate_relocation (part->reloc_arr + i, reloc_info, part, elks_exec);
     
     }
+
+}
+
+
+static unsigned long section_get_num_relocs (struct section *section) {
+
+    unsigned long num_relocs = 0, i;
+    
+    struct section_part *part;
+    struct reloc_howto *howto;
+    
+    for (part = section->first_part; part; part = part->next) {
+    
+        for (i = 0; i < part->reloc_cnt; i++) {
+        
+            howto = part->reloc_arr[i].howto;
+            
+            if (howto == &reloc_howtos[RELOC_TYPE_64] || howto == &reloc_howtos[RELOC_TYPE_32] || howto == &reloc_howtos[RELOC_TYPE_16] || howto == &reloc_howtos[RELOC_TYPE_8]) {
+                num_relocs++;
+            }
+        
+        }
+    
+    }
+    
+    return num_relocs;
+
+}
+
+static unsigned char *write_relocs_for_section (unsigned char *pos, struct section *section) {
+
+    struct section_part *part;
+    struct elks_relocation_info rel;
+    
+    struct symbol *symbol;
+    unsigned long size_log2, i, r_symbolnum;
+    
+    for (part = section->first_part; part; part = part->next) {
+    
+        for (i = 0; i < part->reloc_cnt; i++) {
+        
+            memset (&rel, 0, sizeof (rel));
+            
+            if (part->reloc_arr[i].howto == &reloc_howtos[RELOC_TYPE_64]) {
+                size_log2 = 3;
+            } else if (part->reloc_arr[i].howto == &reloc_howtos[RELOC_TYPE_32]) {
+                size_log2 = 2;
+            } else if (part->reloc_arr[i].howto == &reloc_howtos[RELOC_TYPE_16]) {
+                size_log2 = 1;
+            } else if (part->reloc_arr[i].howto == &reloc_howtos[RELOC_TYPE_8]) {
+                size_log2 = 0;
+            } else {
+                continue;
+            }
+            
+            symbol = part->reloc_arr[i].symbol;
+            
+            if (symbol_is_undefined (symbol)) {
+                symbol = symbol_find (symbol->name);
+            }
+            
+            integer_to_array (part->rva - part->section->rva + part->reloc_arr[i].offset, rel.r_address, 4);
+            
+            if (!symbol->part || strcmp (symbol->part->section->name, ".text") == 0) {
+                r_symbolnum = N_TEXT;
+            } else if (strcmp (symbol->part->section->name, ".data") == 0) {
+                r_symbolnum = N_DATA;
+            } else if (strcmp (symbol->part->section->name, ".bss") == 0) {
+                r_symbolnum = N_BSS;
+            } else {
+                r_symbolnum = N_TEXT;
+            }
+            
+            if ((part->reloc_arr[i].symbolnum >> 27) & 1) {
+                r_symbolnum |= (1LU << 27);
+            }
+            
+            integer_to_array (r_symbolnum | (size_log2 << 25), rel.r_symbolnum, 4);
+            
+            memcpy (pos, &rel, sizeof (rel));
+            pos += sizeof (rel);
+        
+        }
+    
+    }
+    
+    return pos;
+
+}
+
+void elks_write (const char *filename) {
+
+    FILE *fp;
+    
+    unsigned char *data, *pos;
+    unsigned long data_size;
+    
+    struct section *text_section, *data_section, *bss_section;
+    struct elks_exec exec = { 0 };
+    
+    if (!(fp = fopen (filename, "wb"))) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "failed to open '%s' for writing", filename);
+        return;
+    
+    }
+    
+    text_section = section_find (".text");
+    data_section = section_find (".data");
+    bss_section  = section_find (".bss");
+    
+    integer_to_array (ELKS_MAGIC, exec.a_magic, 4);
+    
+    exec.a_flags = 0x10;
+    exec.a_cpu = (state->format == LD_FORMAT_I386_ELKS) ? 0x10 : 0x04;
+    exec.a_hdrlen = sizeof (exec);
+    
+    if (data_section) {
+    
+        integer_to_array (data_section->rva, exec.a_text, 4);
+        
+        if (bss_section) {
+            integer_to_array (bss_section->rva - data_section->rva, exec.a_data, 4);
+        } else {
+            integer_to_array (data_section->total_size, exec.a_data, 4);
+        }
+    
+    } else {
+    
+        integer_to_array (0, exec.a_data, 4);
+        
+        if (bss_section) {
+            integer_to_array (bss_section->rva, exec.a_text, 4);
+        } else {
+            integer_to_array (text_section ? text_section->total_size : 0, exec.a_text, 4);
+        }
+    
+    }
+    
+    integer_to_array (bss_section ? bss_section->total_size : 0, exec.a_bss, 4);
+    integer_to_array (state->entry_point, exec.a_entry, 4);
+    
+    integer_to_array (array_to_integer (exec.a_text, 4) + array_to_integer (exec.a_data, 4), exec.a_total, 4);
+    
+    if (text_section) {
+        integer_to_array (section_get_num_relocs (text_section) * sizeof (struct elks_relocation_info), exec.a_trsize, 4);
+    }
+    
+    if (data_section) {
+        integer_to_array (section_get_num_relocs (data_section) * sizeof (struct elks_relocation_info), exec.a_drsize, 4);
+    }
+    
+    data_size = sizeof (exec);
+    
+    data_size += (array_to_integer (exec.a_text, 4) + array_to_integer (exec.a_data, 4));
+    data_size += (array_to_integer (exec.a_trsize, 4) + array_to_integer (exec.a_drsize, 4));
+    
+    data_size += 4;
+    
+    data = xmalloc (data_size);
+    memcpy (data, &exec, sizeof (exec));
+    
+    pos = data + sizeof (exec);
+    
+    if (text_section) {
+        section_write (text_section, pos);
+    }
+    
+    pos += array_to_integer (exec.a_text, 4);
+    
+    if (data_section) {
+        section_write (data_section, pos);
+    }
+    
+    pos += array_to_integer (exec.a_data, 4);
+    
+    if (text_section) {
+        pos = write_relocs_for_section (pos, text_section);
+    }
+    
+    if (data_section) {
+        pos = write_relocs_for_section (pos, data_section);
+    }
+    
+    integer_to_array (4, pos, 4);
+    
+    if (fwrite (data, data_size, 1, fp) != 1) {
+        report_at (program_name, 0, REPORT_ERROR, "failed to write data to '%s'", filename);
+    }
+    
+    free (data);
+    fclose (fp);
 
 }

@@ -49,6 +49,7 @@ struct reloc_entry {
     unsigned long offset;
     unsigned long addend;
     
+    unsigned long symbolnum;
     struct reloc_howto *howto;
 
 };

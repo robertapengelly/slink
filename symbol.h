@@ -9,7 +9,7 @@
 struct symbol {
 
     char *name;
-    int flags;
+    int flags, n_type;
     
     unsigned long value;
     unsigned long size;

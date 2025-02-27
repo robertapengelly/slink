@@ -6,6 +6,7 @@
 
 struct elks_exec {
 
+    /* offset 0 */
     unsigned char a_magic[2];
     unsigned char a_flags;
     unsigned char a_cpu;
@@ -13,6 +14,7 @@ struct elks_exec {
     unsigned char a_unused;
     unsigned char a_version[2];
     
+    /* offset 8 */
     unsigned char a_text[4];
     unsigned char a_data[4];
     unsigned char a_bss[4];
@@ -20,6 +22,7 @@ struct elks_exec {
     unsigned char a_total[4];
     unsigned char a_syms[4];
     
+    /* offset 32 */
     unsigned char a_trsize[4];
     unsigned char a_drsize[4];
     unsigned char a_trbase[4];
@@ -58,6 +61,7 @@ struct elks_nlist {
 #define     N_TYPE                      0x1e
 #define     ELKS_MAGIC                  0403
 
+void elks_write (const char *filename);
 void read_elks_object (const char *filename, unsigned char *data, unsigned long data_size);
 
 #endif      /* _ELKS_H */

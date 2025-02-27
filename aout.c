@@ -66,18 +66,12 @@ static unsigned char *write_relocs_for_section (unsigned char *pos, struct secti
             symbol = part->reloc_arr[i].symbol;
             
             if (symbol_is_undefined (symbol)) {
-            
                 symbol = symbol_find (symbol->name);
-                
-                if (strcmp (symbol->name, "__etext") == 0 || strcmp (symbol->name, "__edata") == 0 || strcmp (symbol->name, "__end") == 0) {
-                    continue;
-                }
-            
             }
             
             integer_to_array (part->rva - part->section->rva + part->reloc_arr[i].offset, rel.r_address, 4);
             
-            if (strcmp (symbol->part->section->name, ".text") == 0) {
+            if (!symbol->part || strcmp (symbol->part->section->name, ".text") == 0) {
                 r_symbolnum = N_TEXT;
             } else if (strcmp (symbol->part->section->name, ".data") == 0) {
                 r_symbolnum = N_DATA;
@@ -85,6 +79,13 @@ static unsigned char *write_relocs_for_section (unsigned char *pos, struct secti
                 r_symbolnum = N_BSS;
             } else {
                 r_symbolnum = N_TEXT;
+            }
+            
+            if ((part->reloc_arr[i].symbolnum >> 27) & 1) {
+            
+                /*report_at (part->of->filename, 0, REPORT_INTERNAL_ERROR, "symbolnum: %lx", part->reloc_arr[i].symbolnum);*/
+                r_symbolnum |= (1LU << 27);
+            
             }
             
             integer_to_array (r_symbolnum | (size_log2 << 25), rel.r_symbolnum, 4);
@@ -135,13 +136,13 @@ void aout_write (const char *filename) {
     
     } else {
     
+        integer_to_array (0, exec.a_data, 4);
+        
         if (bss_section) {
-            integer_to_array (bss_section->rva - data_section->rva, exec.a_text, 4);
+            integer_to_array (bss_section->rva, exec.a_text, 4);
         } else {
             integer_to_array (text_section ? text_section->total_size : 0, exec.a_text, 4);
         }
-        
-        integer_to_array (0, exec.a_data, 4);
     
     }
     

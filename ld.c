@@ -196,9 +196,9 @@ int main (int argc, char **argv) {
     
     } else if (state->format == LD_FORMAT_I386_AOUT) {
         aout_write (state->output_filename);
-    }/* else if (state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS) {
+    } else if (state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS) {
         elks_write (state->output_filename);
-    }*/ else if (state->format == LD_FORMAT_I386_PE) {
+    } else if (state->format == LD_FORMAT_I386_PE) {
     
         pe_after_link ();
         pe_write (state->output_filename);
