@@ -7,7 +7,7 @@
 struct hashtab_name {
 
     const char *chars;
-    int bytes, hash;
+    unsigned int bytes, hash;
 
 };
 

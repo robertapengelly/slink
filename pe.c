@@ -397,9 +397,9 @@ static unsigned long size_of_code = 0;
 static unsigned long size_of_initialized_data = 0;
 static unsigned long size_of_uninitialized_data = 0;
 
-static unsigned short translate_section_flags_to_characteristics (int flags) {
+static unsigned long translate_section_flags_to_characteristics (int flags) {
 
-    unsigned short characteristics = 0;
+    unsigned long characteristics = 0;
     
     if (!(flags & SECTION_FLAG_READONLY)) {
         characteristics |= IMAGE_SCN_MEM_WRITE;
@@ -444,7 +444,7 @@ static unsigned short translate_section_flags_to_characteristics (int flags) {
 static void write_sections (unsigned char *data) {
 
     unsigned char *pos = data + state->size_of_headers;
-    unsigned short characteristics = 0;
+    unsigned long characteristics = 0;
     
     struct pe_section_table_entry *hdr;
     struct section *section;
@@ -470,7 +470,7 @@ static void write_sections (unsigned char *data) {
         }
         
         characteristics = translate_section_flags_to_characteristics (section->flags);
-        write721_to_byte_array (hdr->Characteristics, characteristics);
+        write741_to_byte_array (hdr->Characteristics, characteristics);
         
         if (characteristics & IMAGE_SCN_CNT_CODE) {
         
