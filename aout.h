@@ -22,8 +22,9 @@ struct aout_exec {
 #define     N_TEXT                      0x04
 #define     N_DATA                      0x06
 #define     N_BSS                       0x08
+#define     N_COMM                      0x12
 
-struct relocation_info {
+struct aout_relocation_info {
 
     unsigned char r_address[4];
     unsigned char r_symbolnum[4];
@@ -32,7 +33,7 @@ struct relocation_info {
 
 #define     N_EXT                       0x01
 
-/*struct aout_nlist {
+struct aout_nlist {
 
     unsigned char n_strx[4];
     unsigned char n_type;
@@ -42,10 +43,12 @@ struct relocation_info {
     
     unsigned char n_value[4];
 
-};*/
+};
 
 #define     N_TYPE                      0x1e
+
 void aout_write (const char *filename);
+void read_aout_object (const char *filename, unsigned char *data, unsigned long data_size);
 
 #define     OMAGIC                      0407
 #define     ZMAGIC                      0413

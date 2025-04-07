@@ -75,10 +75,14 @@ static void read_input_file (const char *filename) {
     
     }
     
-    if (data[0] == ((ELKS_MAGIC >> 8) & 0xff) && data[1] == (ELKS_MAGIC & 0xff)) {
+    /*if (memcmp (data, "!<arch>\n", 8) == 0) {
+        read_archive (filename, data, data_size);
+    } else*/ if (data[0] == 0x01 && data[1] == 0x03) {
         read_elks_object (filename, data, data_size);
+    } else if (data[0] == 0x07 && data[1] == 0x01) {
+        read_aout_object (filename, data, data_size);
     } else {
-        report_at (program_name, 0, REPORT_ERROR, "'%s' is not a valid object", filename);
+        report_at (program_name, 0, REPORT_ERROR, "%s: unrecognised file format", filename);
     }
     
     free (data);
