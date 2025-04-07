@@ -280,6 +280,25 @@ unsigned long array_to_integer (unsigned char *arr, int size) {
 
 }
 
+unsigned long byte_array_to_integer (unsigned char *arr, int size, int big_endian) {
+
+    if (big_endian) {
+    
+        unsigned long value = 0;
+        int i, j;
+        
+        for (i = size, j = 0; i > 0; i--, j++) {
+            value |= arr[j] << (CHAR_BIT * (i - 1));
+        }
+        
+        return value;
+    
+    }
+    
+    return array_to_integer (arr, size);
+
+}
+
 void integer_to_array (unsigned long value, unsigned char *dest, int size) {
 
     int i;
@@ -295,6 +314,15 @@ char *xstrdup (const char *__p) {
     char *p = xmalloc (strlen (__p) + 1);
     
     strcpy (p, __p);
+    return p;
+
+}
+
+char *xstrndup (const char *__p, unsigned long __size) {
+
+    char *p = xmalloc (__size + 1);
+    
+    memcpy (p, __p, __size);
     return p;
 
 }
@@ -460,6 +488,16 @@ void parse_args (int argc, char **argv, int optind) {
         report_at (program_name, 0, REPORT_ERROR, "invalid option -- '%s'", r);
         exit (EXIT_FAILURE);
     
+    }
+
+}
+
+void strip_trailing_spaces (char *__p) {
+
+    char *p = __p + strlen (__p);
+    
+    while (p > __p && p[-1] == ' ') {
+        *--p = '\0';
     }
 
 }

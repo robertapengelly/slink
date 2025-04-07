@@ -6,6 +6,7 @@
 #include    <string.h>
 
 #include    "aout.h"
+#include    "ar.h"
 #include    "elks.h"
 #include    "ld.h"
 #include    "lib.h"
@@ -63,6 +64,119 @@ static int read_file_into_memory (const char *filename, unsigned char **memory_p
 
 }
 
+static void read_object_file (const char *filename, unsigned char *data, unsigned long data_size) {
+
+    if (data[0] == 0x01 && data[1] == 0x03) {
+        read_elks_object (filename, data, data_size);
+    } else if (data[0] == 0x07 && data[1] == 0x01) {
+        read_aout_object (filename, data, data_size);
+    } else {
+        report_at (program_name, 0, REPORT_ERROR, "%s: unrecognised file format", filename);
+    }
+
+}
+
+struct offset_name_table {
+
+    char *name;
+    unsigned long offset;
+
+};
+
+#define     ALREADY_READ                "Already read"
+
+static void read_archive (const char *filename, unsigned char *data) {
+
+    unsigned char *pos = data + 8;
+    struct ar_header *hdr = (struct ar_header *) pos;
+    
+    struct offset_name_table *offset_name_table;
+    char *name, *temp, *string_table_pos;
+    
+    unsigned long no_symbols, data_size, i;
+    
+    name = xstrndup (hdr->name, sizeof (hdr->name));
+    strip_trailing_spaces (name);
+    
+    if (strcmp (name, "/") != 0) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "%s: unable to add symbols: archive has no index; run ranlib to add one", filename);
+        
+        free (name);
+        return;
+    
+    }
+    
+    free (name);
+    pos += sizeof (*hdr);
+    
+    no_symbols = byte_array_to_integer (pos, 4, 1);
+    pos += 4;
+    
+    offset_name_table = xmalloc (sizeof (*offset_name_table) * no_symbols);
+    string_table_pos = (char *) pos + (no_symbols * 4);
+    
+    for (i = 0; i < no_symbols; i++) {
+    
+        offset_name_table[i].offset = byte_array_to_integer (pos, 4, 1);
+        
+        offset_name_table[i].name = (char *) string_table_pos;
+        string_table_pos += strlen (offset_name_table[i].name) + 1;
+    
+    }
+    
+    while (1) {
+    
+        struct symbol *symbol;
+        int change = 0;
+        
+        for (i = 0; i < no_symbols; i++) {
+        
+            if (!(symbol = symbol_find (offset_name_table[i].name)) || !symbol_is_undefined (symbol)) {
+                continue;
+            }
+            
+            pos = data + offset_name_table[i].offset;
+            
+            if (memcmp (pos, ALREADY_READ, sizeof (ALREADY_READ)) == 0) {
+                continue;
+            }
+            
+            hdr = (struct ar_header *) pos;
+            
+            temp = xstrndup (hdr->name, sizeof (hdr->name));
+            strip_trailing_spaces (temp);
+            
+            name = xmalloc (strlen (filename) + 1 + strlen (temp) + 1 + 1);
+            sprintf (name, "%s(%s)", filename, temp);
+            
+            free (temp);
+            
+            temp = xstrndup (hdr->size, sizeof (hdr->size));
+            strip_trailing_spaces (temp);
+            
+            data_size = strtoul (temp, NULL, 10);
+            free (temp);
+            
+            read_object_file (name, pos + sizeof (*hdr), data_size);
+            
+            memcpy (pos, ALREADY_READ, sizeof (ALREADY_READ));
+            free (name);
+            
+            change = 1;
+        
+        }
+        
+        if (change == 0) {
+            break;
+        }
+    
+    }
+    
+    free (offset_name_table);
+
+}
+
 static void read_input_file (const char *filename) {
 
     unsigned char *data;
@@ -75,14 +189,10 @@ static void read_input_file (const char *filename) {
     
     }
     
-    /*if (memcmp (data, "!<arch>\n", 8) == 0) {
-        read_archive (filename, data, data_size);
-    } else*/ if (data[0] == 0x01 && data[1] == 0x03) {
-        read_elks_object (filename, data, data_size);
-    } else if (data[0] == 0x07 && data[1] == 0x01) {
-        read_aout_object (filename, data, data_size);
+    if (memcmp (data, "!<arch>\n", 8) == 0) {
+        read_archive (filename, data);
     } else {
-        report_at (program_name, 0, REPORT_ERROR, "%s: unrecognised file format", filename);
+        read_object_file (filename, data, data_size);
     }
     
     free (data);
@@ -191,7 +301,7 @@ int main (int argc, char **argv) {
         
         }
         
-        if (fwrite (data, data_size, 1, fp) != 1) {
+        if (data_size > 0 && fwrite (data, data_size, 1, fp) != 1) {
             report_at (program_name, 0, REPORT_ERROR, "failed to write data to '%s'", state->output_filename);
         }
         
