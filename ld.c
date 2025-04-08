@@ -159,10 +159,9 @@ static void read_archive (const char *filename, unsigned char *data) {
             free (temp);
             
             read_object_file (name, pos + sizeof (*hdr), data_size);
-            
-            memcpy (pos, ALREADY_READ, sizeof (ALREADY_READ));
             free (name);
             
+            memcpy (pos, ALREADY_READ, sizeof (ALREADY_READ));
             change = 1;
         
         }

@@ -200,7 +200,9 @@ static void check_unresolved (void) {
             if (!(symbol = symbol_find (symbol->name))) {
             
                 symbol = of->symbol_arr + i;
+                
                 report_at (program_name, 0, REPORT_INTERNAL_ERROR, "external symbol '%s' not found in hashtab", symbol->name);
+                exit (EXIT_FAILURE);
             
             }
             
@@ -216,7 +218,10 @@ static void check_unresolved (void) {
     }
     
     if (unresolved) {
+    
         report_at (program_name, 0, REPORT_FATAL_ERROR, "%lu unresolved external%s", unresolved, (unresolved > 1 ? "s" : ""));
+        exit (EXIT_FAILURE);
+    
     }
 
 }
@@ -519,7 +524,7 @@ static void relocate_part (struct section_part *part) {
     struct reloc_entry *relocs = part->reloc_arr;
     
     struct symbol *symbol;
-    unsigned long i;
+    unsigned long undef = 0, i;
     
     for (i = 0; i < part->reloc_cnt; i++) {
     
@@ -534,13 +539,17 @@ static void relocate_part (struct section_part *part) {
             if (!(symbol = symbol_find (symbol->name))) {
             
                 symbol = relocs[i].symbol;
+                
                 report_at (program_name, 0, REPORT_INTERNAL_ERROR, "external symbol '%s' not found in hashtab", symbol->name);
+                exit (EXIT_FAILURE);
             
             }
             
             if (symbol_is_undefined (symbol)) {
             
                 report_at (program_name, 0, REPORT_ERROR, "%s:(%s+%#lu): undefined reference to '%s'", part->of->filename, part->section->name, relocs[i].offset, symbol->name);
+                undef++;
+                
                 continue;
             
             }
@@ -557,6 +566,8 @@ static void relocate_part (struct section_part *part) {
         reloc_generic (part, &relocs[i], symbol);
     
     }
+    
+    if (undef) { exit (EXIT_FAILURE); }
 
 }
 
