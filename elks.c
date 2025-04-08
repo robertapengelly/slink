@@ -456,7 +456,9 @@ void elks_write (const char *filename) {
     unsigned long data_size;
     
     struct section *text_section, *data_section, *bss_section;
-    struct elks_exec exec = { 0 };
+    
+    struct elks_exec exec;
+    memset (&exec, 0, sizeof (exec));
     
     if (!(fp = fopen (filename, "wb"))) {
     
