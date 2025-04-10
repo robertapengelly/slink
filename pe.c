@@ -558,7 +558,7 @@ void pe_after_link (void) {
     }
     
     if (!(reloc_section = section_find (".reloc"))) {
-        report_at (program_name, 0, REPORT_INTERNAL_ERROR, ".reloc section count not be found");
+        report_at (program_name, 0, REPORT_INTERNAL_ERROR, ".reloc section could not be found");
     }
     
     integer_to_array (0, ibr_hdr.RVAOfBlock, 4);

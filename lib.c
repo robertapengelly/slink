@@ -187,6 +187,13 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
             }
             
+            if (xstrcasecmp (optarg, "coff-i386") == 0) {
+            
+                state->format = LD_FORMAT_I386_COFF;
+                break;
+            
+            }
+            
             report_at (program_name, 0, REPORT_ERROR, "unrecognised output format '%s'", optarg);
             exit (EXIT_FAILURE);
         

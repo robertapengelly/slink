@@ -34,7 +34,8 @@ struct ld_state {
 #define     LD_FORMAT_I386_ELKS         0x03
 
 #define     LD_FORMAT_I386_AOUT         0x04
-#define     LD_FORMAT_I386_PE           0x05
+#define     LD_FORMAT_I386_COFF         0x05
+#define     LD_FORMAT_I386_PE           0x06
 
 extern struct ld_state *state;
 extern const char *program_name;

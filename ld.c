@@ -7,6 +7,7 @@
 
 #include    "aout.h"
 #include    "ar.h"
+#include    "coff.h"
 #include    "elks.h"
 #include    "ld.h"
 #include    "lib.h"
@@ -254,7 +255,9 @@ int main (int argc, char **argv) {
     
     }
     
-    if (state->format == LD_FORMAT_I386_PE) {
+    if (state->format == LD_FORMAT_I386_COFF) {
+        coff_before_link ();
+    } else if (state->format == LD_FORMAT_I386_PE) {
         pe_before_link ();
     }
     
@@ -315,6 +318,11 @@ int main (int argc, char **argv) {
     
         pe_after_link ();
         pe_write (state->output_filename);
+    
+    } else if (state->format == LD_FORMAT_I386_COFF) {
+    
+        coff_after_link ();
+        coff_write (state->output_filename);
     
     }
     
