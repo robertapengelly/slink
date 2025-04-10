@@ -159,6 +159,13 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
             }
             
+            if (xstrcasecmp (optarg, "msdos-mz") == 0) {
+            
+                state->format = LD_FORMAT_MZ;
+                break;
+            
+            }
+            
             if (xstrcasecmp (optarg, "elks-ia16") == 0) {
             
                 state->format = LD_FORMAT_IA16_ELKS;

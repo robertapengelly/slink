@@ -366,12 +366,28 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
         
         if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
         
-            if (!((rel->symbolnum >> 31) & 1)/* || (symbol->n_type & N_TYPE) == N_BSS || (symbol->n_type & N_TYPE) == N_DATA || (symbol->n_type & N_TYPE) == N_TEXT*/) {
+            if (!((rel->symbolnum >> rel->n_ext) & 1)/* || (symbol->n_type & N_TYPE) == N_BSS || (symbol->n_type & N_TYPE) == N_DATA || (symbol->n_type & N_TYPE) == N_TEXT*/) {
             
                 /*report_at (__FILE__, __LINE__, REPORT_FATAL_ERROR, "symbol: %s, %lx", symbol->name, ((rel->symbolnum) >> 28));*/
                 
-                if (((rel->symbolnum >> 27) & 1) || (((rel->symbolnum) >> 28) & 0xff) != N_ABS) {
+                if (((rel->symbolnum >> 27) & 1) || ((rel->symbolnum >> rel->n_type) & 0xff) != N_ABS) {
                     report_at (program_name, 0, REPORT_ERROR, "%s:(%s+%#lu): segment relocation", part->of->filename, part->section->name, offset);
+                }
+            
+            }
+        
+        } else if (state->format == LD_FORMAT_MZ) {
+        
+            if (((rel->symbolnum >> rel->n_type) & 0xff) == N_ABS) {
+            
+                if (rel->howto == &reloc_howtos[RELOC_TYPE_64]) {
+                    rel->howto = &reloc_howtos[RELOC_TYPE_PC64];
+                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_32]) {
+                    rel->howto = &reloc_howtos[RELOC_TYPE_PC32];
+                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_16]) {
+                    rel->howto = &reloc_howtos[RELOC_TYPE_PC16];
+                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_8]) {
+                    rel->howto = &reloc_howtos[RELOC_TYPE_PC8];
                 }
             
             }
