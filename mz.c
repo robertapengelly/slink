@@ -51,10 +51,10 @@ static unsigned char *write_relocs_for_section (unsigned char *pos, struct secti
             
                 addr = part->rva + part->reloc_arr[i].offset;
                 
-                integer_to_array (addr % 16, pos, 2);
+                integer_to_array (addr % 65536, pos, 2);
                 pos += 2;
                 
-                integer_to_array (addr / 16, pos, 2);
+                integer_to_array (addr / 65536, pos, 2);
                 pos += 2;
             
             }
@@ -71,8 +71,8 @@ void mz_write (const char *filename) {
 
     FILE *fp;
     
+    unsigned long data_size = 0;
     unsigned char *data, *pos;
-    unsigned long data_size;
     
     struct section *text_section, *data_section, *bss_section;
     unsigned long header_size;
@@ -103,67 +103,72 @@ void mz_write (const char *filename) {
         reloc_count += section_get_num_relocs (data_section);
     }
     
-    reloc_size = ALIGN (reloc_count * 4, 32);
     header_size = ALIGN (sizeof (exec), 16);
+    reloc_size = ALIGN (reloc_count * 4, 16);
+    
+    data_size += header_size + reloc_size;
     
     if (data_section) {
     
+        data_size += data_section->rva;;
         ibss_addr += data_section->rva;
         
         if (bss_section) {
+        
+            data_size += bss_section->rva - data_section->rva;
             ibss_addr += bss_section->rva - data_section->rva;
+        
         } else {
+        
+            data_size += data_section->total_size;
             ibss_addr += data_section->total_size;
+        
         }
     
     } else {
     
         if (bss_section) {
+        
+            data_size += bss_section->rva;
             ibss_addr += bss_section->rva;
+        
         } else {
+        
+            data_size += text_section ? text_section->total_size : 0;
             ibss_addr += text_section ? text_section->total_size : 0;
+        
         }
     
     }
     
-    ibss_addr = ibss_addr + reloc_size;
+    stack_addr = ibss_addr;
     
     if (bss_section) {
         ibss_size = bss_section->total_size;
     }
     
-    stack_addr = ibss_addr + ibss_size;
-    stack_size = 0x1000;        /* Maybe get this from command line in future. */
+    /*stack_addr += ibss_size;*/
+    stack_size = 0x1000;        /* Maybe get this from command line in the future. */
     
     exec.e_magic[0] = 'M';
     exec.e_magic[1] = 'Z';
     
-    write721_to_byte_array (exec.e_cblp, (ibss_addr % 512));
+    write721_to_byte_array (exec.e_cblp, ibss_addr % 512);
     write721_to_byte_array (exec.e_cp, ALIGN (ibss_addr, 512) / 512);
     
     write721_to_byte_array (exec.e_crlc, reloc_count);
     write721_to_byte_array (exec.e_cparhdr, (header_size + reloc_size) / 16);
     
-    write721_to_byte_array (exec.e_minalloc, (ALIGN (ibss_size + stack_size, 16) / 16));
+    write721_to_byte_array (exec.e_minalloc, ALIGN (ibss_size + stack_size, 16) / 16);
     write721_to_byte_array (exec.e_maxalloc, 0xFFFF);
     
-    write721_to_byte_array (exec.e_ss, (stack_addr / 16));
-    write721_to_byte_array (exec.e_sp, ALIGN (stack_addr % 16 + stack_size, 16));
+    write721_to_byte_array (exec.e_ss, stack_addr / 16);
+    write721_to_byte_array (exec.e_sp, stack_addr % 16 + stack_size);
     
     write721_to_byte_array (exec.e_ip, state->entry_point % 16);
     write721_to_byte_array (exec.e_cs, state->entry_point / 16);
     
     write721_to_byte_array (exec.e_lfarlc, header_size);
-    
-    data_size = header_size + reloc_size;
-    
-    if (text_section) {
-        data_size += text_section->total_size;
-    }
-    
-    if (data_section) {
-        data_size += data_section->total_size;
-    }
     
     data = xmalloc (data_size);
     memcpy (data, &exec, sizeof (exec));

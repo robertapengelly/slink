@@ -378,23 +378,29 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
         
         } else if (state->format == LD_FORMAT_MZ) {
         
-            if (((rel->symbolnum >> rel->n_type) & 0xff) == N_ABS) {
+            if (strcmp (symbol->name, "DGROUP")) {
             
-                if (rel->howto == &reloc_howtos[RELOC_TYPE_64]) {
-                    rel->howto = &reloc_howtos[RELOC_TYPE_PC64];
-                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_32]) {
-                    rel->howto = &reloc_howtos[RELOC_TYPE_PC32];
-                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_16]) {
-                    rel->howto = &reloc_howtos[RELOC_TYPE_PC16];
-                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_8]) {
-                    rel->howto = &reloc_howtos[RELOC_TYPE_PC8];
+                int is_section = (strcmp (symbol->name, ".text") == 0) || (strcmp (symbol->name, ".data") == 0) || (strcmp (symbol->name, ".bss") == 0);
+                
+                if (is_section || (((rel->symbolnum >> rel->n_type) & 0xff) != N_TEXT && ((rel->symbolnum >> rel->n_type) & 0xff) != N_DATA && ((rel->symbolnum >> rel->n_type) & 0xff) != N_BSS)) {
+                
+                    if (rel->howto == &reloc_howtos[RELOC_TYPE_64]) {
+                        rel->howto = &reloc_howtos[RELOC_TYPE_PC64];
+                    } else if (rel->howto == &reloc_howtos[RELOC_TYPE_32]) {
+                        rel->howto = &reloc_howtos[RELOC_TYPE_PC32];
+                    } else if (rel->howto == &reloc_howtos[RELOC_TYPE_16]) {
+                        rel->howto = &reloc_howtos[RELOC_TYPE_PC16];
+                    } else if (rel->howto == &reloc_howtos[RELOC_TYPE_8]) {
+                        rel->howto = &reloc_howtos[RELOC_TYPE_PC8];
+                    }
+                
                 }
             
             }
         
         }
         
-        if (xstrcasecmp (symbol->name, "__etext") == 0 || xstrcasecmp (symbol->name, "__edata") == 0 || xstrcasecmp (symbol->name, "__end") == 0) {
+        if (xstrcasecmp (symbol->name, "DGROUP__edata") == 0 || xstrcasecmp (symbol->name, "DGROUP__end") == 0 || xstrcasecmp (symbol->name, "__etext") == 0 || xstrcasecmp (symbol->name, "__edata") == 0 || xstrcasecmp (symbol->name, "__end") == 0) {
         
             if (rel->howto == &reloc_howtos[RELOC_TYPE_64]) {
                 rel->howto = &reloc_howtos[RELOC_TYPE_PC64];
@@ -751,6 +757,66 @@ void link (void) {
         
         symbol->section_number = ABSOLUTE_SECTION_NUMBER;
         symbol->value = value / 16;
+        
+        symbol_record_external_symbol (symbol);
+    
+    }
+    
+    value = 0;
+    
+    if ((symbol = symbol_find ("DGROUP__edata")) && symbol_is_undefined (symbol)) {
+    
+        unsigned long data_addr = 0;
+        
+        if ((section = section_find (".text"))) {
+            data_addr = align_section_if_needed (section->total_size);
+        }
+        
+        value = data_addr;
+        
+        if ((section = section_find (".data"))) {
+            value += align_section_if_needed (section->total_size);
+        }
+        
+        of = object_file_make (FAKE_LD_FILENAME, 1);
+        
+        symbol = of->symbol_arr;
+        symbol->name = xstrdup ("DGROUP__edata");
+        
+        symbol->section_number = ABSOLUTE_SECTION_NUMBER;
+        symbol->value = value - (data_addr & 0xfffffff0);
+        
+        symbol_record_external_symbol (symbol);
+    
+    }
+    
+    value = 0;
+    
+    if ((symbol = symbol_find ("DGROUP__end")) && symbol_is_undefined (symbol)) {
+    
+        unsigned long data_addr = 0;
+        
+        if ((section = section_find (".text"))) {
+            data_addr = align_section_if_needed (section->total_size);
+        }
+        
+        value = data_addr;
+        
+        if ((section = section_find (".data"))) {
+            value += align_section_if_needed (section->total_size);
+        }
+        
+        if ((section = section_find (".bss"))) {
+            value += align_section_if_needed (section->total_size);
+        }
+        
+        of = object_file_make (FAKE_LD_FILENAME, 1);
+        
+        symbol = of->symbol_arr;
+        symbol->name = xstrdup ("DGROUP__end");
+        
+        symbol->section_number = ABSOLUTE_SECTION_NUMBER;
+        symbol->value = value - (data_addr & 0xfffffff0);
         
         symbol_record_external_symbol (symbol);
     
