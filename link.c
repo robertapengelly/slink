@@ -6,7 +6,6 @@
 #include    <stdlib.h>
 #include    <string.h>
 
-#include    "elks.h"
 #include    "ld.h"
 #include    "lib.h"
 #include    "pe.h"
@@ -297,9 +296,7 @@ static void calculate_section_sizes_and_rvas (void) {
 static void reloc_generic (struct section_part *part, struct reloc_entry *rel, struct symbol *symbol) {
 
     unsigned char opcode = (part->content + rel->offset - 1)[0];
-    unsigned int size = rel->howto->size;
-    
-    unsigned long result = 0, offset = rel->offset;
+    unsigned long result = 0, size = rel->howto->size, offset = rel->offset;
     
     switch (size) {
     
@@ -370,7 +367,7 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
             
                 /*report_at (__FILE__, __LINE__, REPORT_FATAL_ERROR, "symbol: %s, %lx", symbol->name, ((rel->symbolnum) >> 28));*/
                 
-                if (((rel->symbolnum >> 27) & 1) || ((rel->symbolnum >> rel->n_type) & 0xff) != N_ABS) {
+                if (((rel->symbolnum >> 27) & 1) || ((rel->symbolnum >> rel->n_type) & 0xff) != 2) {
                     report_at (program_name, 0, REPORT_ERROR, "%s:(%s+%#lu): segment relocation", part->of->filename, part->section->name, offset);
                 }
             
@@ -378,11 +375,11 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
         
         } else if (state->format == LD_FORMAT_MZ) {
         
-            if (strcmp (symbol->name, "DGROUP")) {
+            if (xstrcasecmp (symbol->name, "DGROUP")) {
             
-                int is_section = (strcmp (symbol->name, ".text") == 0) || (strcmp (symbol->name, ".data") == 0) || (strcmp (symbol->name, ".bss") == 0);
+                int is_section = (xstrcasecmp (symbol->name, ".text") == 0) || (xstrcasecmp (symbol->name, ".data") == 0) || (xstrcasecmp (symbol->name, ".bss") == 0);
                 
-                if (is_section || (((rel->symbolnum >> rel->n_type) & 0xff) != N_TEXT && ((rel->symbolnum >> rel->n_type) & 0xff) != N_DATA && ((rel->symbolnum >> rel->n_type) & 0xff) != N_BSS)) {
+                if (is_section || (((rel->symbolnum >> rel->n_type) & 0xff) != 4 && ((rel->symbolnum >> rel->n_type) & 0xff) != 6 && ((rel->symbolnum >> rel->n_type) & 0xff) != 8)) {
                 
                     if (rel->howto == &reloc_howtos[RELOC_TYPE_64]) {
                         rel->howto = &reloc_howtos[RELOC_TYPE_PC64];
@@ -425,27 +422,11 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
     
     result >>= rel->howto->final_right_shift;
     
-    if (!rel->howto->pc_rel && !rel->howto->no_base) {
-    
-        if (has_dgroup) {
-        
-            if (xstrcasecmp (symbol->name, "__etext") != 0 && xstrcasecmp (symbol->name, "__edata") != 0 && xstrcasecmp (symbol->name, "__end") != 0) {
-            
-                if (result >= dgroup_start) {
-                    result -= (dgroup_start & 0xfffffff0);
-                }
-            
-            }
-        
-        }
-    
-    }
-    
-    if (opcode == 0xff) {
+    if (opcode == 0xff || opcode == 0x9A) {
     
         if (result >= 65535) {
         
-            report_at (program_name, 0, REPORT_ERROR, "%s:(%s+%#lu): call exceeds 65535 bytes", part->of->filename, part->section->name, offset);
+            /*report_at (program_name, 0, REPORT_ERROR, "%s:(%s+%#lu): call exceeds 65535 bytes", part->of->filename, part->section->name, offset);*/
             
             if (rel->howto == &reloc_howtos[RELOC_TYPE_PC64]) {
                 rel->howto = &reloc_howtos[RELOC_TYPE_64];
@@ -477,21 +458,47 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
             *(p + 0) = 0xE8;
             *(p + 3) = 0x90;
             
-            result -= part->rva + rel->offset;
+            result -= part->rva + offset;
+            result -= size;
             
             while (size > 2) {
             
-                result--;
                 size--;
+                /*result--;*/
             
             }
             
             offset++;
-            result--;
+            result++;
         
         }
     
+    } else {
+    
+        /*if (!rel->howto->pc_rel && !rel->howto->no_base) {*/
+        /*if (!((rel->symbolnum >> rel->n_ext) & 1) || symbol->section_number == ABSOLUTE_SECTION_NUMBER) {*/
+        
+            if (has_dgroup/* && ((rel->symbolnum >> rel->n_type) & 0xff) != N_ABS*/) {
+            
+                if (xstrcasecmp (symbol->name, "__etext") != 0 && xstrcasecmp (symbol->name, "__edata") != 0 && xstrcasecmp (symbol->name, "__end") != 0) {
+                
+                    if (result >= dgroup_start) {
+                        result -= (dgroup_start & 0xfffffff0);
+                    }
+                
+                }
+            
+            }
+        
+        /*} else if (result >= dgroup_start && ((rel->symbolnum >> rel->n_type) & 0xff) != N_ABS) {
+            printf ("%x, %lx, %lx, %lx\n", opcode, part->rva + offset + 0x30, result, dgroup_start);
+        }*/
+    
     }
+    
+    /*if (strcmp (part->section->name, ".text")) {
+        printf ("%lx, %lx, %lx\n", part->rva + offset + 0x30, result, dgroup_start);
+    }*/
     
     switch (size) {
     
@@ -744,7 +751,7 @@ void link (void) {
     if ((symbol = symbol_find ("DGROUP")) && symbol_is_undefined (symbol)) {
     
         if ((section = section_find (".text"))) {
-            value = align_section_if_needed (section->total_size);
+            value += align_section_if_needed (section->total_size);
         }
         
         dgroup_start = value;
@@ -766,13 +773,9 @@ void link (void) {
     
     if ((symbol = symbol_find ("DGROUP__edata")) && symbol_is_undefined (symbol)) {
     
-        unsigned long data_addr = 0;
-        
         if ((section = section_find (".text"))) {
-            data_addr = align_section_if_needed (section->total_size);
+            value += align_section_if_needed (section->total_size);
         }
-        
-        value = data_addr;
         
         if ((section = section_find (".data"))) {
             value += align_section_if_needed (section->total_size);
@@ -784,7 +787,7 @@ void link (void) {
         symbol->name = xstrdup ("DGROUP__edata");
         
         symbol->section_number = ABSOLUTE_SECTION_NUMBER;
-        symbol->value = value - (data_addr & 0xfffffff0);
+        symbol->value = value;
         
         symbol_record_external_symbol (symbol);
     
@@ -794,13 +797,9 @@ void link (void) {
     
     if ((symbol = symbol_find ("DGROUP__end")) && symbol_is_undefined (symbol)) {
     
-        unsigned long data_addr = 0;
-        
         if ((section = section_find (".text"))) {
-            data_addr = align_section_if_needed (section->total_size);
+            value += align_section_if_needed (section->total_size);
         }
-        
-        value = data_addr;
         
         if ((section = section_find (".data"))) {
             value += align_section_if_needed (section->total_size);
@@ -816,7 +815,7 @@ void link (void) {
         symbol->name = xstrdup ("DGROUP__end");
         
         symbol->section_number = ABSOLUTE_SECTION_NUMBER;
-        symbol->value = value - (data_addr & 0xfffffff0);
+        symbol->value = value;
         
         symbol_record_external_symbol (symbol);
     
@@ -827,7 +826,7 @@ void link (void) {
     if ((symbol = symbol_find ("__etext")) && symbol_is_undefined (symbol)) {
     
         if ((section = section_find (".text"))) {
-            value = align_section_if_needed (section->total_size);
+            value += align_section_if_needed (section->total_size);
         }
         
         of = object_file_make (FAKE_LD_FILENAME, 1);
@@ -847,7 +846,7 @@ void link (void) {
     if ((symbol = symbol_find ("__edata")) && symbol_is_undefined (symbol)) {
     
         if ((section = section_find (".data"))) {
-            value = align_section_if_needed (section->total_size);
+            value += align_section_if_needed (section->total_size);
         }
         
         of = object_file_make (FAKE_LD_FILENAME, 1);
@@ -867,7 +866,7 @@ void link (void) {
     if ((symbol = symbol_find ("__end")) && symbol_is_undefined (symbol)) {
     
         if ((section = section_find (".bss"))) {
-            value = align_section_if_needed (section->total_size);
+            value += align_section_if_needed (section->total_size);
         }
         
         of = object_file_make (FAKE_LD_FILENAME, 1);

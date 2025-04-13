@@ -17,7 +17,7 @@ static void translate_relocation (struct reloc_entry *reloc, struct aout_relocat
     unsigned long r_symbolnum = array_to_integer (input_reloc->r_symbolnum, 4);
     
     unsigned long r_address = array_to_integer (input_reloc->r_address, 4);
-    long symbolnum = (r_symbolnum & 0x7fffff);
+    long symbolnum = (r_symbolnum & 0xffffff);
     
     if ((r_symbolnum >> 27) & 1) {      /* ext */
     

@@ -108,46 +108,25 @@ void mz_write (const char *filename) {
     
     data_size += header_size + reloc_size;
     
-    if (data_section) {
+    if (text_section) {
     
-        data_size += data_section->rva;;
-        ibss_addr += data_section->rva;
-        
-        if (bss_section) {
-        
-            data_size += bss_section->rva - data_section->rva;
-            ibss_addr += bss_section->rva - data_section->rva;
-        
-        } else {
-        
-            data_size += data_section->total_size;
-            ibss_addr += data_section->total_size;
-        
-        }
-    
-    } else {
-    
-        if (bss_section) {
-        
-            data_size += bss_section->rva;
-            ibss_addr += bss_section->rva;
-        
-        } else {
-        
-            data_size += text_section ? text_section->total_size : 0;
-            ibss_addr += text_section ? text_section->total_size : 0;
-        
-        }
+        data_size += text_section->total_size;
+        ibss_addr += text_section->total_size;
     
     }
     
-    stack_addr = ibss_addr;
+    if (data_section) {
+    
+        data_size += data_section->total_size;
+        ibss_addr += data_section->total_size;
+    
+    }
     
     if (bss_section) {
         ibss_size = bss_section->total_size;
     }
     
-    /*stack_addr += ibss_size;*/
+    stack_addr = header_size + reloc_size + ibss_addr + ibss_size;
     stack_size = 0x1000;        /* Maybe get this from command line in the future. */
     
     exec.e_magic[0] = 'M';
