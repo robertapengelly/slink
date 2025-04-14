@@ -53,8 +53,10 @@ static void translate_relocation (struct reloc_entry *reloc, struct elks_relocat
     
     reloc->symbolnum = r_symbolnum;
     reloc->offset = r_address;
-    reloc->n_type = 28;
     reloc->n_ext = 31;
+    
+    reloc->n_type = ((r_symbolnum >> 28) & 0xff);
+    reloc->n_type &= ~(1 << 4);
     
     switch (1U << ((r_symbolnum >> 29) & 3)) {
     

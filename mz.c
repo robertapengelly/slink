@@ -107,11 +107,16 @@ void mz_write (const char *filename) {
     reloc_size = ALIGN (reloc_count * 4, 16);
     
     data_size += header_size + reloc_size;
+    ibss_addr += header_size + reloc_size;
+    
+    /*stack_addr += header_size + reloc_size;*/
     
     if (text_section) {
     
         data_size += text_section->total_size;
         ibss_addr += text_section->total_size;
+        
+        stack_addr += text_section->total_size;
     
     }
     
@@ -119,6 +124,8 @@ void mz_write (const char *filename) {
     
         data_size += data_section->total_size;
         ibss_addr += data_section->total_size;
+        
+        stack_addr += data_section->total_size;
     
     }
     
@@ -126,7 +133,8 @@ void mz_write (const char *filename) {
         ibss_size = bss_section->total_size;
     }
     
-    stack_addr = header_size + reloc_size + ibss_addr + ibss_size;
+    stack_addr = ALIGN (stack_addr + ibss_size, 16);
+    /*stack_addr = ALIGN (ibss_addr + ibss_size, 16);*/
     stack_size = 0x1000;        /* Maybe get this from command line in the future. */
     
     exec.e_magic[0] = 'M';
