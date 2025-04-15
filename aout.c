@@ -58,6 +58,7 @@ static void translate_relocation (struct reloc_entry *reloc, struct aout_relocat
     reloc->n_type = ((r_symbolnum >> 24) & 0xff);
     reloc->n_type &= ~(1 << 3);
     
+    reloc->r_symbolnum = r_symbolnum;
     reloc->n_ext = ((r_symbolnum >> 27) & 1);
     
     switch (1U << ((r_symbolnum >> 25) & 3)) {
@@ -437,7 +438,7 @@ static unsigned char *write_relocs_for_section (unsigned char *pos, struct secti
                 r_symbolnum = N_TEXT;
             }
             
-            if ((part->reloc_arr[i].symbolnum >> 27) & 1) {
+            if ((part->reloc_arr[i].r_symbolnum >> 27) & 1) {
             
                 /*report_at (part->of->filename, 0, REPORT_INTERNAL_ERROR, "symbolnum: %lx", part->reloc_arr[i].symbolnum);*/
                 r_symbolnum |= (1LU << 27);

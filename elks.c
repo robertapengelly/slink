@@ -57,8 +57,9 @@ static void translate_relocation (struct reloc_entry *reloc, struct elks_relocat
     reloc->offset = r_address;
     
     reloc->n_type = ((r_symbolnum >> 28) & 0xff);
-    reloc->n_type &= ~(1 << 4);
+    reloc->n_type &= ~(1 << 3);
     
+    reloc->r_symbolnum = r_symbolnum;
     reloc->n_ext = ((r_symbolnum >> 31) & 1);
     
     switch (1U << ((r_symbolnum >> 29) & 3)) {
@@ -438,7 +439,7 @@ static unsigned char *write_relocs_for_section (unsigned char *pos, struct secti
                 r_symbolnum = N_TEXT;
             }
             
-            if ((part->reloc_arr[i].symbolnum >> 27) & 1) {
+            if ((part->reloc_arr[i].r_symbolnum >> 27) & 1) {
                 r_symbolnum |= (1LU << 27);
             }
             

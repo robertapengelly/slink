@@ -391,8 +391,6 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
                         rel->howto = &reloc_howtos[RELOC_TYPE_PC8];
                     }
                 
-                } else {
-                    printf ("%d, %d\n", is_section, rel->n_type);
                 }
             
             }
@@ -426,103 +424,106 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
     
     /*printf ("%lx\n", n_type);*/
     
-    if (opcode == 0x9A || opcode == 0xFF || rel->n_type == 4) {
+    if (state->format == LD_FORMAT_MZ || state->format == LD_FORMAT_IA16_ELKS) {
     
-        unsigned char *p = part->content + offset;
-        /*printf ("relocating: %s: %s: %lx, %lx, %d\n", part->of->filename, symbol->name, part->rva + offset + 0x40, rel->symbolnum, rel->n_type);*/
+        if (opcode == 0x9A || opcode == 0xFF || rel->n_type == 4) {
         
-        if ((opcode != 0x9A && opcode != 0xFF) || result >= 65535) {
-        
-            if (opcode == 0xFF) { *(p - 1) = 0x9A; }
+            unsigned char *p = part->content + offset;
+            /*printf ("relocating: %s: %s: %lx, %lx, %d\n", part->of->filename, symbol->name, part->rva + offset + 0x40, rel->symbolnum, rel->n_type);*/
             
-            if (rel->howto == &reloc_howtos[RELOC_TYPE_PC64]) {
-                rel->howto = &reloc_howtos[RELOC_TYPE_64];
-            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC32]) {
-                rel->howto = &reloc_howtos[RELOC_TYPE_32];
-            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC16]) {
-                rel->howto = &reloc_howtos[RELOC_TYPE_16];
-            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC8]) {
-                rel->howto = &reloc_howtos[RELOC_TYPE_8];
-            }
+            if ((opcode != 0x9A && opcode != 0xFF) || result >= 65535) {
             
-            while (rel->howto->size > 2) {
-                rel->howto->size--;
-            }
-            
-            rel->offset += 2;
-            
-            if (result >= dgroup_start) {
-            
-                unsigned long temp = result - (dgroup_start & 0xfffffff0);
-                result = (((unsigned long) dgroup_start / 16) << 16) | (unsigned long) temp;
-            
-            } else {
-                result = (((unsigned long) result / 16) << 16) | (unsigned long) result % 16;
-            }
-            
-            /*printf ("relocating: %s: %lx, %lx, %lx\n", rel->symbol->name, part->rva + offset + 0x60, result, size);*/
-            size = 4;
-        
-        } else if (opcode == 0x9A || opcode == 0xFF) {
-        
-            if (rel->howto == &reloc_howtos[RELOC_TYPE_64]) {
-                rel->howto = &reloc_howtos[RELOC_TYPE_PC64];
-            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_32]) {
-                rel->howto = &reloc_howtos[RELOC_TYPE_PC32];
-            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_16]) {
-                rel->howto = &reloc_howtos[RELOC_TYPE_PC16];
-            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_8]) {
-                rel->howto = &reloc_howtos[RELOC_TYPE_PC8];
-            }
-            
-            if (opcode == 0x9A) {
-            
-                *(p - 1) = 0x0E;
-                *(p + 0) = 0xE8;
-                *(p + 3) = 0x90;
+                if (opcode == 0xFF) { *(p - 1) = 0x9A; }
                 
-                result -= part->rva + offset;
-                result -= size;
-                
-                while (size > 2) {
-                    size--;
+                if (rel->howto == &reloc_howtos[RELOC_TYPE_PC64]) {
+                    rel->howto = &reloc_howtos[RELOC_TYPE_64];
+                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC32]) {
+                    rel->howto = &reloc_howtos[RELOC_TYPE_32];
+                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC16]) {
+                    rel->howto = &reloc_howtos[RELOC_TYPE_16];
+                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC8]) {
+                    rel->howto = &reloc_howtos[RELOC_TYPE_8];
                 }
                 
-                offset++;
-                result++;
+                while (rel->howto->size > 2) {
+                    rel->howto->size--;
+                }
+                
+                rel->offset += 2;
+                
+                if (result >= dgroup_start) {
+                
+                    unsigned long temp = result - (dgroup_start & 0xfffffff0);
+                    result = (((unsigned long) dgroup_start / 16) << 16) | (unsigned long) temp;
+                
+                } else {
+                    result = (((unsigned long) result / 16) << 16) | (unsigned long) result % 16;
+                }
+                
+                /*printf ("relocating: %s: %lx, %lx, %lx\n", rel->symbol->name, part->rva + offset + 0x60, result, size);*/
+                size = 4;
             
-            } else {
+            } else if (opcode == 0x9A || opcode == 0xFF) {
             
-                *(p - 1) = 0x0E;
-                *(p + 0) = 0x3E;
-                *(p + 1) = 0xE8;
+                if (rel->howto == &reloc_howtos[RELOC_TYPE_64]) {
+                    rel->howto = &reloc_howtos[RELOC_TYPE_PC64];
+                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_32]) {
+                    rel->howto = &reloc_howtos[RELOC_TYPE_PC32];
+                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_16]) {
+                    rel->howto = &reloc_howtos[RELOC_TYPE_PC16];
+                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_8]) {
+                    rel->howto = &reloc_howtos[RELOC_TYPE_PC8];
+                }
                 
-                result -= part->rva + offset;
-                result -= size;
+                if (opcode == 0x9A) {
                 
-                while (size > 2) {
-                
+                    *(p - 1) = 0x0E;
+                    *(p + 0) = 0xE8;
+                    *(p + 3) = 0x90;
+                    
+                    result -= part->rva + offset;
+                    result -= size;
+                    
+                    while (size > 2) {
+                        size--;
+                    }
+                    
                     offset++;
-                    size--;
+                    result++;
+                
+                } else {
+                
+                    *(p - 1) = 0x0E;
+                    *(p + 0) = 0x3E;
+                    *(p + 1) = 0xE8;
+                    
+                    result -= part->rva + offset;
+                    result -= size;
+                    
+                    while (size > 2) {
+                    
+                        offset++;
+                        size--;
+                    
+                    }
                 
                 }
             
             }
         
-        }
-    
-    } else if (opcode != 0xE8 && has_dgroup && result >= dgroup_start) {
-    
-        /*printf ("relocating: %s: %s: %lx, %lx, %d\n", part->of->filename, symbol->name, part->rva + offset + 0x40, rel->symbolnum, rel->n_type);*/
+        } else if (opcode != 0xE8 && has_dgroup && result >= dgroup_start) {
         
-        if (xstrcasecmp (symbol->name, "DGROUP__edata") != 0 && xstrcasecmp (symbol->name, "DGROUP__end") != 0 && xstrcasecmp (symbol->name, "__etext") != 0 && xstrcasecmp (symbol->name, "__edata") != 0 && xstrcasecmp (symbol->name, "__end") != 0) {
-        
-            if (result >= dgroup_start) {
-                result -= (dgroup_start & 0xfffffff0);
+            /*printf ("relocating: %s: %s: %lx, %lx, %d\n", part->of->filename, symbol->name, part->rva + offset + 0x40, rel->symbolnum, rel->n_type);*/
+            
+            if (xstrcasecmp (symbol->name, "DGROUP__edata") != 0 && xstrcasecmp (symbol->name, "DGROUP__end") != 0 && xstrcasecmp (symbol->name, "__etext") != 0 && xstrcasecmp (symbol->name, "__edata") != 0 && xstrcasecmp (symbol->name, "__end") != 0) {
+            
+                if (result >= dgroup_start) {
+                    result -= (dgroup_start & 0xfffffff0);
+                }
+            
             }
         
         }
-    
     
     }
     
