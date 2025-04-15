@@ -27,6 +27,8 @@ static void translate_relocation (struct reloc_entry *reloc, struct elks_relocat
         if (xstrcasecmp (reloc->symbol->name, "DGROUP") == 0) {
             r_symbolnum &= ~(1LU << 31);
         }
+        
+        symbolnum = (reloc->symbol->n_type & N_TYPE);
     
     } else {
     
@@ -51,12 +53,13 @@ static void translate_relocation (struct reloc_entry *reloc, struct elks_relocat
     
     }
     
-    reloc->symbolnum = r_symbolnum;
+    reloc->symbolnum = symbolnum;
     reloc->offset = r_address;
-    reloc->n_ext = 31;
     
     reloc->n_type = ((r_symbolnum >> 28) & 0xff);
     reloc->n_type &= ~(1 << 4);
+    
+    reloc->n_ext = ((r_symbolnum >> 31) & 1);
     
     switch (1U << ((r_symbolnum >> 29) & 3)) {
     

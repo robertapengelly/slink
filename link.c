@@ -363,11 +363,11 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
         
         if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
         
-            if (!((rel->symbolnum >> rel->n_ext) & 1)/* || (symbol->n_type & N_TYPE) == N_BSS || (symbol->n_type & N_TYPE) == N_DATA || (symbol->n_type & N_TYPE) == N_TEXT*/) {
+            if (!rel->n_ext/* || (symbol->n_type & N_TYPE) == N_BSS || (symbol->n_type & N_TYPE) == N_DATA || (symbol->n_type & N_TYPE) == N_TEXT*/) {
             
                 /*report_at (__FILE__, __LINE__, REPORT_FATAL_ERROR, "symbol: %s, %lx", symbol->name, ((rel->symbolnum) >> 28));*/
                 
-                if (((rel->symbolnum >> 27) & 1) || rel->n_type != 2) {
+                if (rel->n_type != 2) {
                     report_at (program_name, 0, REPORT_ERROR, "%s:(%s+%#lu): segment relocation", part->of->filename, part->section->name, offset);
                 }
             
@@ -379,7 +379,7 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
             
                 int is_section = (xstrcasecmp (symbol->name, ".text") == 0) || (xstrcasecmp (symbol->name, ".data") == 0) || (xstrcasecmp (symbol->name, ".bss") == 0);
                 
-                if (is_section || (rel->n_type != 4 && rel->n_type != 6 && rel->n_type != 8)) {
+                if (is_section || (rel->n_type != 4 && rel->n_type != 6 && rel->n_type != 8) || rel->symbolnum == 0 || rel->symbolnum == 4 || rel->symbolnum == 8) {
                 
                     if (rel->howto == &reloc_howtos[RELOC_TYPE_64]) {
                         rel->howto = &reloc_howtos[RELOC_TYPE_PC64];
@@ -391,6 +391,8 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
                         rel->howto = &reloc_howtos[RELOC_TYPE_PC8];
                     }
                 
+                } else {
+                    printf ("%d, %d\n", is_section, rel->n_type);
                 }
             
             }
@@ -424,47 +426,45 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
     
     /*printf ("%lx\n", n_type);*/
     
-    if (opcode == 0xFF || opcode == 0x9A || rel->n_type == 0x04) {
+    if (opcode == 0x9A || opcode == 0xFF || rel->n_type == 4) {
     
-        /*printf ("%lx\n", (rel->symbolnum >> rel->n_type) & 0xff);*/
-        
         unsigned char *p = part->content + offset;
+        /*printf ("relocating: %s: %s: %lx, %lx, %d\n", part->of->filename, symbol->name, part->rva + offset + 0x40, rel->symbolnum, rel->n_type);*/
         
         if ((opcode != 0x9A && opcode != 0xFF) || result >= 65535) {
         
-            if (opcode == 0x9A || opcode == 0xFF) {
+            if (opcode == 0xFF) { *(p - 1) = 0x9A; }
             
-                *(p - 1) = 0x9A;
-            
-                if (rel->howto == &reloc_howtos[RELOC_TYPE_PC64]) {
-                    rel->howto = &reloc_howtos[RELOC_TYPE_64];
-                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC32]) {
-                    rel->howto = &reloc_howtos[RELOC_TYPE_32];
-                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC16]) {
-                    rel->howto = &reloc_howtos[RELOC_TYPE_16];
-                } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC8]) {
-                    rel->howto = &reloc_howtos[RELOC_TYPE_8];
-                }
-                
-                result = (((unsigned long) result / 16) << 16) | (unsigned long) result % 16;
-                
-                /*if (opcode != 0x9A && opcode != 0xFF) {
-                    printf ("%x, %lx, %lx, %lx\n", rel->n_type, part->rva + offset + 0x30, result, size);
-                }*/
-                
-                while (rel->howto->size > 2) {
-                
-                    rel->howto->size--;
-                    rel->offset++;
-                
-                }
-            
+            if (rel->howto == &reloc_howtos[RELOC_TYPE_PC64]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_64];
+            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC32]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_32];
+            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC16]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_16];
+            } else if (rel->howto == &reloc_howtos[RELOC_TYPE_PC8]) {
+                rel->howto = &reloc_howtos[RELOC_TYPE_8];
             }
-        
-        } else {
-        
-            /*printf ("%x, %lx, %lx, %lx\n", rel->n_type, part->rva + offset + 0x30, result, size);*/
             
+            while (rel->howto->size > 2) {
+                rel->howto->size--;
+            }
+            
+            rel->offset += 2;
+            
+            if (result >= dgroup_start) {
+            
+                unsigned long temp = result - (dgroup_start & 0xfffffff0);
+                result = (((unsigned long) dgroup_start / 16) << 16) | (unsigned long) temp;
+            
+            } else {
+                result = (((unsigned long) result / 16) << 16) | (unsigned long) result % 16;
+            }
+            
+            /*printf ("relocating: %s: %lx, %lx, %lx\n", rel->symbol->name, part->rva + offset + 0x60, result, size);*/
+            size = 4;
+        
+        } else if (opcode == 0x9A || opcode == 0xFF) {
+        
             if (rel->howto == &reloc_howtos[RELOC_TYPE_64]) {
                 rel->howto = &reloc_howtos[RELOC_TYPE_PC64];
             } else if (rel->howto == &reloc_howtos[RELOC_TYPE_32]) {
@@ -511,35 +511,20 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
         
         }
     
-    } else if (opcode != 0xE8 && rel->n_type != 0x04) {
+    } else if (opcode != 0xE8 && has_dgroup && result >= dgroup_start) {
     
-        /*if (!rel->howto->pc_rel && !rel->howto->no_base) {*/
-        /*if (!((rel->symbolnum >> rel->n_ext) & 1) || symbol->section_number == ABSOLUTE_SECTION_NUMBER) {*/
+        /*printf ("relocating: %s: %s: %lx, %lx, %d\n", part->of->filename, symbol->name, part->rva + offset + 0x40, rel->symbolnum, rel->n_type);*/
         
-            if (has_dgroup/* && rel->n_type != N_ABS*/) {
-            
-                if (xstrcasecmp (symbol->name, "DGROUP__edata") != 0 && xstrcasecmp (symbol->name, "DGROUP__end") != 0 && xstrcasecmp (symbol->name, "__etext") != 0 && xstrcasecmp (symbol->name, "__edata") != 0 && xstrcasecmp (symbol->name, "__end") != 0) {
-                
-                    if (result >= dgroup_start) {
-                        result -= (dgroup_start & 0xfffffff0);
-                        /*printf ("%lx, %lx, %lx\n", part->rva + offset + 0x30, result, dgroup_start);*/
-                    }
-                
-                }
-            
+        if (xstrcasecmp (symbol->name, "DGROUP__edata") != 0 && xstrcasecmp (symbol->name, "DGROUP__end") != 0 && xstrcasecmp (symbol->name, "__etext") != 0 && xstrcasecmp (symbol->name, "__edata") != 0 && xstrcasecmp (symbol->name, "__end") != 0) {
+        
+            if (result >= dgroup_start) {
+                result -= (dgroup_start & 0xfffffff0);
             }
         
-        /*} else if (result >= dgroup_start && rel->n_type != 2) {
-            printf ("%x, %lx, %lx, %lx\n", opcode, part->rva + offset + 0x30, result, dgroup_start);
-        }*/
-        
-        /*printf ("%lx, %lx, %lx, %lx\n", (rel->symbolnum >> rel->n_type) & 0xff, part->rva + offset + 0x30, result, dgroup_start);*/
+        }
+    
     
     }
-    
-    /*if (strcmp (part->section->name, ".text")) {
-        printf ("%lx, %lx, %lx\n", part->rva + offset + 0x30, result, dgroup_start);
-    }*/
     
     switch (size) {
     
@@ -791,8 +776,10 @@ void link (void) {
     
     if ((symbol = symbol_find ("DGROUP")) && symbol_is_undefined (symbol)) {
     
-        if ((section = section_find (".text"))) {
-            value += align_section_if_needed (section->total_size);
+        if ((section = section_find (".data"))) {
+            value += align_section_if_needed (section->rva);
+        } else if ((section = section_find (".bss"))) {
+            value += align_section_if_needed (section->rva);
         }
         
         dgroup_start = value;
@@ -814,12 +801,8 @@ void link (void) {
     
     if ((symbol = symbol_find ("DGROUP__edata")) && symbol_is_undefined (symbol)) {
     
-        if ((section = section_find (".text"))) {
-            value += align_section_if_needed (section->total_size);
-        }
-        
         if ((section = section_find (".data"))) {
-            value += align_section_if_needed (section->total_size);
+            value += align_section_if_needed (section->rva + section->total_size);
         }
         
         of = object_file_make (FAKE_LD_FILENAME, 1);
@@ -839,15 +822,14 @@ void link (void) {
     
     if ((symbol = symbol_find ("DGROUP__end")) && symbol_is_undefined (symbol)) {
     
-        if ((section = section_find (".data"))) {
-            value += align_section_if_needed (section->total_size);
-        }
-        
         if ((section = section_find (".bss"))) {
-            value += align_section_if_needed (section->total_size);
+            value += align_section_if_needed (section->rva + section->total_size);
+        } else if ((section = section_find (".data"))) {
+            value += align_section_if_needed (section->rva + section->total_size);
         }
         
         of = object_file_make (FAKE_LD_FILENAME, 1);
+        value -= (dgroup_start & 0xfffffff0);
         
         symbol = of->symbol_arr;
         symbol->name = xstrdup ("DGROUP__end");

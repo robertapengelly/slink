@@ -106,36 +106,34 @@ void mz_write (const char *filename) {
     header_size = ALIGN (sizeof (exec), 16);
     reloc_size = ALIGN (reloc_count * 4, 16);
     
-    data_size += header_size + reloc_size;
-    ibss_addr += header_size + reloc_size;
-    
-    /*stack_addr += header_size + reloc_size;*/
-    
-    if (text_section) {
-    
-        data_size += text_section->total_size;
-        ibss_addr += text_section->total_size;
-        
-        stack_addr += text_section->total_size;
-    
-    }
-    
     if (data_section) {
     
-        data_size += data_section->total_size;
-        ibss_addr += data_section->total_size;
-        
-        stack_addr += data_section->total_size;
+        if (bss_section) {
+            data_size += bss_section->rva;
+        } else {
+            data_size += data_section->rva + data_section->total_size;
+        }
+    
+    } else {
+    
+        if (bss_section) {
+            data_size += bss_section->rva;
+        } else if (text_section) {
+            data_size += text_section->total_size;
+        }
     
     }
+    
+    data_size += header_size + reloc_size;
+    ibss_addr = data_size;
     
     if (bss_section) {
         ibss_size = bss_section->total_size;
     }
     
-    stack_addr = ALIGN (stack_addr + ibss_size, 16);
-    /*stack_addr = ALIGN (ibss_addr + ibss_size, 16);*/
-    stack_size = 0x1000;        /* Maybe get this from command line in the future. */
+    stack_addr = ALIGN (ibss_addr + ibss_size, 16);
+    stack_size = 0x2000;        /* Maybe get this from command line in the future. */
+    
     
     exec.e_magic[0] = 'M';
     exec.e_magic[1] = 'Z';
@@ -162,25 +160,35 @@ void mz_write (const char *filename) {
     
     pos = data + header_size;
     
-    if (text_section) {
-        pos = write_relocs_for_section (pos, text_section);
+    if (reloc_count) {
+    
+        if (text_section) {
+            pos = write_relocs_for_section (pos, text_section);
+        }
+        
+        if (data_section) {
+            pos = write_relocs_for_section (pos, data_section);
+        }
+    
     }
     
-    if (data_section) {
-        pos = write_relocs_for_section (pos, data_section);
-    }
+    pos = data;
     
-    pos = data + header_size + reloc_size;
+    pos += header_size;
+    pos += reloc_size;
     
     if (text_section) {
     
+        pos += text_section->rva;
         section_write (text_section, pos);
-        pos += text_section->total_size;
     
     }
     
     if (data_section) {
+    
+        pos += data_section->rva;
         section_write (data_section, pos);
+    
     }
     
     if (fwrite (data, data_size, 1, fp) != 1) {

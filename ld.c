@@ -68,6 +68,8 @@ static int read_file_into_memory (const char *filename, unsigned char **memory_p
 
 static void read_object_file (const char *filename, unsigned char *data, unsigned long data_size) {
 
+    /*printf ("reading: %s\n", filename);*/
+    
     if (data[0] == 0x01 && data[1] == 0x03) {
         read_elks_object (filename, data, data_size);
     } else if (data[0] == 0x07 && data[1] == 0x01) {
