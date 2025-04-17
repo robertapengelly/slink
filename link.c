@@ -424,7 +424,7 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
     
     /*printf ("%lx\n", n_type);*/
     
-    if (state->format == LD_FORMAT_MZ || state->format == LD_FORMAT_IA16_ELKS) {
+    if (state->emulation == LD_EMULATION_IA16_ELKS || state->format == LD_EMULATION_IA16_MZ) {
     
         if (opcode == 0x9A || opcode == 0xFF || rel->n_type == 4) {
         
@@ -773,72 +773,76 @@ void link (void) {
     
     }
     
-    value = 0;
+    if (state->emulation == LD_EMULATION_IA16_ELKS || state->format == LD_EMULATION_IA16_MZ) {
     
-    if ((symbol = symbol_find ("DGROUP")) && symbol_is_undefined (symbol)) {
-    
-        if ((section = section_find (".data"))) {
-            value += align_section_if_needed (section->rva);
-        } else if ((section = section_find (".bss"))) {
-            value += align_section_if_needed (section->rva);
+        value = 0;
+        
+        if ((symbol = symbol_find ("DGROUP")) && symbol_is_undefined (symbol)) {
+        
+            if ((section = section_find (".data"))) {
+                value += align_section_if_needed (section->rva);
+            } else if ((section = section_find (".bss"))) {
+                value += align_section_if_needed (section->rva);
+            }
+            
+            dgroup_start = value;
+            has_dgroup = 1;
+            
+            of = object_file_make (FAKE_LD_FILENAME, 1);
+            
+            symbol = of->symbol_arr;
+            symbol->name = xstrdup ("DGROUP");
+            
+            symbol->section_number = ABSOLUTE_SECTION_NUMBER;
+            symbol->value = value / 16;
+            
+            symbol_record_external_symbol (symbol);
+        
         }
         
-        dgroup_start = value;
-        has_dgroup = 1;
+        value = 0;
         
-        of = object_file_make (FAKE_LD_FILENAME, 1);
+        if ((symbol = symbol_find ("DGROUP__edata")) && symbol_is_undefined (symbol)) {
         
-        symbol = of->symbol_arr;
-        symbol->name = xstrdup ("DGROUP");
+            if ((section = section_find (".data"))) {
+                value += align_section_if_needed (section->rva + section->total_size);
+            }
+            
+            of = object_file_make (FAKE_LD_FILENAME, 1);
+            value -= (dgroup_start & 0xfffffff0);
+            
+            symbol = of->symbol_arr;
+            symbol->name = xstrdup ("DGROUP__edata");
+            
+            symbol->section_number = ABSOLUTE_SECTION_NUMBER;
+            symbol->value = value;
+            
+            symbol_record_external_symbol (symbol);
         
-        symbol->section_number = ABSOLUTE_SECTION_NUMBER;
-        symbol->value = value / 16;
-        
-        symbol_record_external_symbol (symbol);
-    
-    }
-    
-    value = 0;
-    
-    if ((symbol = symbol_find ("DGROUP__edata")) && symbol_is_undefined (symbol)) {
-    
-        if ((section = section_find (".data"))) {
-            value += align_section_if_needed (section->rva + section->total_size);
         }
         
-        of = object_file_make (FAKE_LD_FILENAME, 1);
-        value -= (dgroup_start & 0xfffffff0);
+        value = 0;
         
-        symbol = of->symbol_arr;
-        symbol->name = xstrdup ("DGROUP__edata");
+        if ((symbol = symbol_find ("DGROUP__end")) && symbol_is_undefined (symbol)) {
         
-        symbol->section_number = ABSOLUTE_SECTION_NUMBER;
-        symbol->value = value;
+            if ((section = section_find (".bss"))) {
+                value += align_section_if_needed (section->rva + section->total_size);
+            } else if ((section = section_find (".data"))) {
+                value += align_section_if_needed (section->rva + section->total_size);
+            }
+            
+            of = object_file_make (FAKE_LD_FILENAME, 1);
+            value -= (dgroup_start & 0xfffffff0);
+            
+            symbol = of->symbol_arr;
+            symbol->name = xstrdup ("DGROUP__end");
+            
+            symbol->section_number = ABSOLUTE_SECTION_NUMBER;
+            symbol->value = value;
+            
+            symbol_record_external_symbol (symbol);
         
-        symbol_record_external_symbol (symbol);
-    
-    }
-    
-    value = 0;
-    
-    if ((symbol = symbol_find ("DGROUP__end")) && symbol_is_undefined (symbol)) {
-    
-        if ((section = section_find (".bss"))) {
-            value += align_section_if_needed (section->rva + section->total_size);
-        } else if ((section = section_find (".data"))) {
-            value += align_section_if_needed (section->rva + section->total_size);
         }
-        
-        of = object_file_make (FAKE_LD_FILENAME, 1);
-        value -= (dgroup_start & 0xfffffff0);
-        
-        symbol = of->symbol_arr;
-        symbol->name = xstrdup ("DGROUP__end");
-        
-        symbol->section_number = ABSOLUTE_SECTION_NUMBER;
-        symbol->value = value;
-        
-        symbol_record_external_symbol (symbol);
     
     }
     

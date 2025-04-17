@@ -33,14 +33,15 @@ static struct options_with_use fmt_tbl[] = {
 
 #define     LD_OPTION_IGNORED                               0
 #define     LD_OPTION_EMIT_RELOCS                           1
-#define     LD_OPTION_ENTRY                                 2
-#define     LD_OPTION_FORMAT                                3
-#define     LD_OPTION_GENERATE_SYMBOLS_TABLE                4
-#define     LD_OPTION_HELP                                  5
-#define     LD_OPTION_IMAGE_BASE                            6
-#define     LD_OPTION_MAP                                   7
-#define     LD_OPTION_MAP_FILE                              8
-#define     LD_OPTION_OUTFILE                               9
+#define     LD_OPTION_EMULATION                             2
+#define     LD_OPTION_ENTRY                                 3
+#define     LD_OPTION_FORMAT                                4
+#define     LD_OPTION_GENERATE_SYMBOLS_TABLE                5
+#define     LD_OPTION_HELP                                  6
+#define     LD_OPTION_IMAGE_BASE                            7
+#define     LD_OPTION_MAP                                   8
+#define     LD_OPTION_MAP_FILE                              9
+#define     LD_OPTION_OUTFILE                               10
 
 static struct ld_option opts[] = {
 
@@ -49,6 +50,7 @@ static struct ld_option opts[] = {
     {   "-N",                           LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
     
     {   "-e",                           LD_OPTION_ENTRY,                        LD_OPTION_HAS_ARG   },
+    {   "-m",                           LD_OPTION_EMULATION,                    LD_OPTION_HAS_ARG   },
     {   "-o",                           LD_OPTION_OUTFILE,                      LD_OPTION_HAS_ARG   },
     {   "-s",                           LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
     {   "-q",                           LD_OPTION_EMIT_RELOCS,                  LD_OPTION_NO_ARG    },
@@ -79,6 +81,10 @@ static void print_usage (void) {
         fprintf (stderr, "Options:\n\n");
         
         fprintf (stderr, "    -e ADDRESS, --entry ADDRESS       Set start address.\n");
+        fprintf (stderr, "    -m EMULATION                      Set emulation. (default none)\n");
+        fprintf (stderr, "                                          Supported emualtions are:\n");
+        fprintf (stderr, "                                              i386aout, i386coff, i386elks, i386pe\n");
+        fprintf (stderr, "                                              ia16_elks, ia16_mz\n");
         fprintf (stderr, "    -q, --emit-relocs                 Generate relocations in final output.\n");
         fprintf (stderr, "    -s, --strip-all                   Ignored.\n");
         
@@ -94,7 +100,7 @@ static void print_usage (void) {
         
         fprintf (stderr, "    --generate-symbols-table          Generate a symbols table from global symbols.\n");
         fprintf (stderr, "    --help                            Print option help.\n");
-        fprintf (stderr, "    --oformat FORMAT                  Specify the format of output file (default msdos)\n");
+        fprintf (stderr, "    --oformat FORMAT                  Specify the format of output file (default msdos).\n");
         fprintf (stderr, "                                          Supported formats are:\n");
         fprintf (stderr, "                                              a.out-i386, elks-ia16, elks-i386, pe-i386\n");
         fprintf (stderr, "                                              binary, msdos\n");
@@ -122,6 +128,55 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
         
             state->emit_relocs = 1;
             break;
+        
+        }
+        
+        case LD_OPTION_EMULATION: {
+        
+            if (xstrcasecmp (optarg, "ia16_elks") == 0) {
+            
+                state->emulation = LD_EMULATION_IA16_ELKS;
+                break;
+            
+            }
+            
+            if (xstrcasecmp (optarg, "ia16_mz") == 0) {
+            
+                state->emulation = LD_EMULATION_IA16_MZ;
+                break;
+            
+            }
+            
+            if (xstrcasecmp (optarg, "i386aout") == 0) {
+            
+                state->emulation = LD_EMULATION_I386_AOUT;
+                break;
+            
+            }
+            
+            if (xstrcasecmp (optarg, "i386coff") == 0) {
+            
+                state->emulation = LD_EMULATION_I386_COFF;
+                break;
+            
+            }
+            
+            if (xstrcasecmp (optarg, "i386elks") == 0) {
+            
+                state->emulation = LD_EMULATION_I386_ELKS;
+                break;
+            
+            }
+            
+            if (xstrcasecmp (optarg, "i386pe") == 0) {
+            
+                state->emulation = LD_EMULATION_I386_PE;
+                break;
+            
+            }
+            
+            report_at (program_name, 0, REPORT_ERROR, "unrecognised emulation mode '%s'", optarg);
+            exit (EXIT_FAILURE);
         
         }
         
@@ -162,6 +217,11 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             if (xstrcasecmp (optarg, "msdos-mz") == 0) {
             
                 state->format = LD_FORMAT_MZ;
+                
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_IA16_MZ;
+                }
+                
                 break;
             
             }
@@ -169,6 +229,11 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             if (xstrcasecmp (optarg, "elks-ia16") == 0) {
             
                 state->format = LD_FORMAT_IA16_ELKS;
+                
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_IA16_ELKS;
+                }
+                
                 break;
             
             }
@@ -176,6 +241,11 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             if (xstrcasecmp (optarg, "elks-i386") == 0) {
             
                 state->format = LD_FORMAT_I386_ELKS;
+                
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_I386_ELKS;
+                }
+                
                 break;
             
             }
@@ -183,6 +253,11 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             if (xstrcasecmp (optarg, "a.out-i386") == 0) {
             
                 state->format = LD_FORMAT_I386_AOUT;
+                
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_I386_AOUT;
+                }
+                
                 break;
             
             }
@@ -190,6 +265,11 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             if (xstrcasecmp (optarg, "pe-i386") == 0) {
             
                 state->format = LD_FORMAT_I386_PE;
+                
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_I386_PE;
+                }
+                
                 break;
             
             }
@@ -197,6 +277,11 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             if (xstrcasecmp (optarg, "coff-i386") == 0) {
             
                 state->format = LD_FORMAT_I386_COFF;
+                
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_I386_COFF;
+                }
+                
                 break;
             
             }
@@ -484,16 +569,20 @@ void parse_args (int argc, char **argv, int optind) {
         
         }
         
-        options_with_use = &fmt_tbl[state->format];
+        if (state->emulation != LD_EMULATION_NONE) {
         
-        if (options_with_use->check_option && options_with_use->use_option) {
-        
-            int idx;
+            options_with_use = &fmt_tbl[state->emulation - 1];
             
-            if ((idx = options_with_use->check_option (r, argc, argv, &optind, &optarg)) >= 0) {
+            if (options_with_use->check_option && options_with_use->use_option) {
             
-                options_with_use->use_option (r, idx, optarg);
-                continue;
+                int idx;
+                
+                if ((idx = options_with_use->check_option (r, argc, argv, &optind, &optarg)) >= 0) {
+                
+                    options_with_use->use_option (r, idx, optarg);
+                    continue;
+                
+                }
             
             }
         

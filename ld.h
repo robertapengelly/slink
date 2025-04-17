@@ -24,8 +24,21 @@ struct ld_state {
     unsigned long size_of_headers;
     
     int generate_symbols_table;
+    int emulation;
 
 };
+
+
+#define     LD_EMULATION_NONE           0x00
+
+#define     LD_EMULATION_IA16_ELKS      0x01
+#define     LD_EMULATION_IA16_MZ        0x02
+
+#define     LD_EMULATION_I386_AOUT      0x03
+#define     LD_EMULATION_I386_COFF      0x04
+#define     LD_EMULATION_I386_ELKS      0x05
+#define     LD_EMULATION_I386_PE        0x06
+
 
 #define     LD_FORMAT_COM               0x00
 #define     LD_FORMAT_MZ                0x01
@@ -38,6 +51,7 @@ struct ld_state {
 #define     LD_FORMAT_I386_COFF         0x06
 
 #define     LD_FORMAT_I386_PE           0x07
+
 
 extern struct ld_state *state;
 extern const char *program_name;
