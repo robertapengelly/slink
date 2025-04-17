@@ -1,6 +1,8 @@
 /******************************************************************************
  * @file            mz.c
  *****************************************************************************/
+#include    <ctype.h>
+#include    <errno.h>
 #include    <stdio.h>
 #include    <stdlib.h>
 #include    <string.h>
@@ -12,6 +14,105 @@
 #include    "section.h"
 #include    "symbol.h"
 #include    "write7x.h"
+
+unsigned long stack_size = 0x1000;
+#define     LD_OPTION_STACK                                 1
+
+static struct ld_option opts[] = {
+
+    {   "--stack",          LD_OPTION_STACK,        LD_OPTION_HAS_ARG   },
+    {   0,                  0,                      0                   }
+
+};
+
+int mz_check_option (const char *cmd_arg, int argc, char **argv, int *optind, const char **optarg) {
+
+    struct ld_option *popt;
+    
+    for (popt = opts; ; popt++) {
+    
+        const char *p1 = popt->name;
+        const char *r1 = cmd_arg;
+        
+        if (!p1) {
+            break;    
+        }
+        
+        if (!strstart (p1, &r1)) {
+            continue;
+        }
+        
+        (*optarg) = r1;
+        
+        if (popt->flgs & LD_OPTION_HAS_ARG) {
+        
+            if (*r1 == '\0') {
+            
+                if ((*optind) >= argc) {
+                
+                    report_at (program_name, 0, REPORT_ERROR, "argument to '%s' is missing", cmd_arg);
+                    exit (EXIT_FAILURE);
+                
+                }
+                
+                (*optarg) = argv[(*optind)++];
+            
+            }
+        
+        } else if (*r1 != '\0') {
+            continue;
+        }
+        
+        return popt->idx;
+    
+    }
+    
+    return -1;
+
+}
+
+void mz_use_option (const char *cmd_arg, int idx, const char *optarg) {
+
+    switch (idx) {
+    
+        case LD_OPTION_STACK: {
+        
+            long conversion;
+            char *temp;
+            
+            errno = 0;
+            conversion = strtol (optarg, &temp, 0);
+            
+            if (!*optarg || isspace ((int) *optarg) || errno || *temp) {
+            
+                report_at (program_name, 0, REPORT_ERROR, "invalid stack number '%s'", optarg);
+                exit (EXIT_FAILURE);
+            
+            }
+            
+            stack_size = (unsigned long) conversion;
+            break;
+        
+        }
+        
+        default: {
+        
+            report_at (program_name, 0, REPORT_ERROR, "unsupported option '%s'", cmd_arg);
+            exit (EXIT_FAILURE);
+        
+        }
+    
+    }
+
+}
+
+void mz_print_help (void) {
+
+    fprintf (stderr, "ia16_mz:\n\n");
+    fprintf (stderr, "    --stack <size>                    Set size of the initial stack.\n");
+
+}
+
 
 static unsigned long section_get_num_relocs (struct section *section) {
 
@@ -78,8 +179,7 @@ void mz_write (const char *filename) {
     unsigned long header_size;
     
     unsigned long reloc_size = 0, reloc_count = 0;
-    unsigned long ibss_addr = 0, ibss_size = 0;
-    unsigned long stack_addr = 0, stack_size = 0;
+    unsigned long stack_addr = 0, ibss_addr = 0, ibss_size = 0;
     
     struct mz_exec exec;
     memset (&exec, 0, sizeof (exec));
@@ -132,7 +232,6 @@ void mz_write (const char *filename) {
     }
     
     stack_addr = ALIGN (ibss_addr + ibss_size, 16);
-    stack_size = 0x2000;        /* Maybe get this from command line in the future. */
     
     
     exec.e_magic[0] = 'M';

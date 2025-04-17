@@ -1,5 +1,5 @@
 /******************************************************************************
- * @file            pe.h
+ * @file            mz.h
  *****************************************************************************/
 #ifndef     _MZ_H
 #define     _MZ_H
@@ -25,6 +25,11 @@ struct mz_exec {
     unsigned char e_ovno[2];            /* Overlay number                       */
 
 };
+
+int mz_check_option (const char *cmd_arg, int argc, char **argv, int *optind, const char **optarg);
+
+void mz_print_help (void);
+void mz_use_option (const char *cmd_arg, int idx, const char *optarg);
 
 void mz_write (const char *filename);
 

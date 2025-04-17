@@ -10,24 +10,27 @@
 
 #include    "ld.h"
 #include    "lib.h"
+#include    "mz.h"
 #include    "pe.h"
 #include    "report.h"
 
 struct options_with_use {
 
+    void (*print_help) (void);
+    
     int (*check_option) (const char *cmd_arg, int argc, char **argv, int *optind, const char **optarg);
     void (*use_option) (const char *cmd_arg, int idx, const char *optarg);
 
 };
 
-static struct options_with_use fmt_tbl[] = {
+static struct options_with_use emulation_table[] = {
 
-    {   0,                      0               },
-    {   0,                      0               },
-    {   0,                      0               },
-    {   0,                      0               },
-    {   0,                      0               },
-    {   &pe_check_option,       &pe_use_option  }
+    {   0,                      0,                      0               },
+    {   &mz_print_help,         &mz_check_option,       &mz_use_option  },
+    {   0,                      0,                      0               },
+    {   0,                      0,                      0               },
+    {   0,                      0,                      0               },
+    {   &pe_print_help,         &pe_check_option,       &pe_use_option  }
 
 };
 
@@ -77,6 +80,8 @@ static void print_usage (void) {
 
     if (program_name) {
     
+        struct options_with_use *options_with_use;
+        
         fprintf (stderr, "Usage: %s [options] file...\n\n", program_name);
         fprintf (stderr, "Options:\n\n");
         
@@ -107,8 +112,17 @@ static void print_usage (void) {
         fprintf (stderr, "    --image-base <address>            Set base address of the executable.\n");
         
         fprintf (stderr, "\n");
-        pe_print_help ();
-        fprintf (stderr, "\n");
+        
+        for (options_with_use = emulation_table; ; options_with_use++) {
+        
+            if (options_with_use->print_help) {
+            
+                options_with_use->print_help ();
+                fprintf (stderr, "\n");
+            
+            }
+        
+        }
     
     }
 
@@ -571,7 +585,7 @@ void parse_args (int argc, char **argv, int optind) {
         
         if (state->emulation != LD_EMULATION_NONE) {
         
-            options_with_use = &fmt_tbl[state->emulation - 1];
+            options_with_use = &emulation_table[state->emulation - 1];
             
             if (options_with_use->check_option && options_with_use->use_option) {
             
