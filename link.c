@@ -424,7 +424,7 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
     
     /*printf ("%lx\n", n_type);*/
     
-    if (state->emulation == LD_EMULATION_IA16_ELKS || state->format == LD_EMULATION_IA16_MZ) {
+    if (state->emulation == LD_EMULATION_IA16_ELKS || state->emulation == LD_EMULATION_IA16_MZ) {
     
         if (opcode == 0x9A || opcode == 0xFF || rel->n_type == 4) {
         
@@ -773,7 +773,7 @@ void link (void) {
     
     }
     
-    if (state->emulation == LD_EMULATION_IA16_ELKS || state->format == LD_EMULATION_IA16_MZ) {
+    if (state->emulation == LD_EMULATION_IA16_ELKS || state->emulation == LD_EMULATION_IA16_MZ) {
     
         value = 0;
         
