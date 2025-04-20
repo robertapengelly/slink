@@ -397,7 +397,7 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
         
         }
         
-        if (strcasecmp (symbol->name, "DGROUP__edata") == 0 || xstrcasecmp (symbol->name, "DGROUP__end") == 0 || xstrcasecmp (symbol->name, "__etext") == 0 || xstrcasecmp (symbol->name, "__edata") == 0 || xstrcasecmp (symbol->name, "__end") == 0) {
+        if (xstrcasecmp (symbol->name, "DGROUP__edata") == 0 || xstrcasecmp (symbol->name, "DGROUP__end") == 0 || xstrcasecmp (symbol->name, "__etext") == 0 || xstrcasecmp (symbol->name, "__edata") == 0 || xstrcasecmp (symbol->name, "__end") == 0) {
         
             if (rel->howto == &reloc_howtos[RELOC_TYPE_64]) {
                 rel->howto = &reloc_howtos[RELOC_TYPE_PC64];
