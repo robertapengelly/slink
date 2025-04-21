@@ -80,7 +80,7 @@ static void print_usage (void) {
 
     if (program_name) {
     
-        struct options_with_use *options_with_use;
+        int emul_count = sizeof (emulation_table) / sizeof (emulation_table[0]), i;
         
         fprintf (stderr, "Usage: %s [options] file...\n\n", program_name);
         fprintf (stderr, "Options:\n\n");
@@ -113,11 +113,11 @@ static void print_usage (void) {
         
         fprintf (stderr, "\n");
         
-        for (options_with_use = emulation_table; ; options_with_use++) {
+        for (i = 0; i < emul_count; i++) {
         
-            if (options_with_use->print_help) {
+            if (emulation_table[i].print_help) {
             
-                options_with_use->print_help ();
+                emulation_table[i].print_help ();
                 fprintf (stderr, "\n");
             
             }
