@@ -457,7 +457,8 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
                     result = (((unsigned long) dgroup_start / 16) << 16) | (unsigned long) temp;
                 
                 } else {
-                    result = (((unsigned long) result / 16) << 16) | (unsigned long) result % 16;
+                    /*result = (((unsigned long) result / 16) << 16) | (unsigned long) result % 16;*/
+                    result = (((unsigned long) result / 65536) << 16) | (unsigned long) result % 65536;
                 }
                 
                 /*printf ("relocating: %s: %lx, %lx, %lx\n", rel->symbol->name, part->rva + offset + 0x60, result, size);*/
