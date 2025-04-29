@@ -12,6 +12,7 @@
 #include    "ld.h"
 #include    "lib.h"
 #include    "mz.h"
+#include    "omf.h"
 #include    "pe.h"
 #include    "report.h"
 #include    "section.h"
@@ -74,6 +75,8 @@ static void read_object_file (const char *filename, unsigned char *data, unsigne
         read_elks_object (filename, data, data_size);
     } else if (data[0] == 0x07 && data[1] == 0x01) {
         read_aout_object (filename, data, data_size);
+    } else if (data[0] == RECORD_TYPE_THEADR) {
+        read_omf_object (filename, data, data_size);
     } else {
         report_at (program_name, 0, REPORT_ERROR, "%s: unrecognised file format", filename);
     }
