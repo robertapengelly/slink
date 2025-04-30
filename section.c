@@ -180,6 +180,34 @@ struct subsection *subsection_find (struct section *section, const char *name) {
 
 }
 
+struct subsection *subsection_find_or_make (struct section *section, const char *name) {
+
+    struct subsection *subsection, **next_p;
+    
+    for (subsection = *(next_p = &section->all_subsections); subsection; subsection = *(next_p = &subsection->next)) {
+    
+        if (strcmp (name, subsection->name) <= 0) {
+            break;
+        }
+    
+    }
+    
+    if (!subsection || strcmp (name, subsection->name) != 0) {
+    
+        subsection = xmalloc (sizeof (*subsection));
+        
+        subsection->name = xstrdup (name);
+        subsection->next = *next_p;
+        subsection->last_part_p = &subsection->first_part;
+        
+        *next_p = subsection;
+    
+    }
+    
+    return subsection;
+
+}
+
 void subsection_append_section_part (struct subsection *subsection, struct section_part *part) {
 
     *subsection->last_part_p = part;

@@ -15,10 +15,10 @@
 #define     RECORD_TYPE_FIXUPP          0x9C
 #define     RECORD_TYPE_LEDATA          0xA0
 
-#define     SEGMENT_ATTR_P              0x1
+#define     SEGMENT_ATTR_P              0x01
 
-#define     METHOD_T2_EXTDEF            2
-#define     METHOD_F5                   5
+#define     METHOD_T2_EXTDEF            0x02
+#define     METHOD_F5                   0x05
 
 void read_omf_object (const char *filename, unsigned char *data, unsigned long data_size);
 

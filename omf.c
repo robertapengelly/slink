@@ -16,6 +16,7 @@
 static void estimate (void *data, unsigned long data_size, const char *filename, unsigned long *num_segments_p, unsigned long *num_extdefs_p, unsigned long *num_pubdefs_p, unsigned long *num_lnames_p) {
 
     unsigned char *pos = (unsigned char *) data;
+    unsigned char base_segment_index;
     
     unsigned char record_type;
     unsigned short record_len;
@@ -80,20 +81,31 @@ static void estimate (void *data, unsigned long data_size, const char *filename,
         
         } else if (record_type == RECORD_TYPE_PUBDEF) {
         
-            pubdef_name_end = (pubdef_name = pos) + record_len - 3;
+            unsigned long prefix = 1;
+            unsigned long suffix = 2 + 1;
+            
+            pubdef_name_end = pos + record_len - 1;
             
             if (big_fields) {
+                suffix += 2;
+            }
             
-                report_at (program_name, 0, REPORT_INTERNAL_ERROR, "%s: big fields not supported for record %#x", filename, record_type);
-                exit (EXIT_FAILURE);
+            base_segment_index = pos[1];
+            
+            if (!base_segment_index) {
+            
+                report_at (program_name, 0, REPORT_WARNING, "%s: PUBDEF Base Frame is not supported", filename);
+                prefix += 2;
             
             }
             
+            pubdef_name = pos + 2;
+            
             while (pubdef_name != pubdef_name_end) {
             
-                pubdef_name_len = pubdef_name[2];
+                pubdef_name_len = pubdef_name[prefix - 1];
                 
-                if (pubdef_name + 2 + 1 + pubdef_name_len + 1 > pubdef_name_end) {
+                if (pubdef_name + prefix + pubdef_name_len + suffix > pubdef_name_end) {
                 
                     report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: incorrect pubdef string length", filename);
                     exit (EXIT_FAILURE);
@@ -101,7 +113,7 @@ static void estimate (void *data, unsigned long data_size, const char *filename,
                 }
                 
                 num_pubdefs++;
-                pubdef_name = pubdef_name + 2 + 1 + pubdef_name_len + 1;
+                pubdef_name = pubdef_name + prefix + pubdef_name_len + suffix;
             
             }
         
@@ -249,30 +261,45 @@ void read_omf_object (const char *filename, unsigned char *data, unsigned long d
         
         } else if (record_type == RECORD_TYPE_PUBDEF) {
         
-            pubdef_name_end = (pubdef_name = pos) + record_len - 3;
-            base_segment_index = pubdef_name[1];
+            unsigned long prefix = 1;
+            unsigned long suffix = 2 + 1;
+            
+            pubdef_name_end = pos + record_len - 1;
+            
+            if (big_fields) {
+                suffix += 2;
+            }
+            
+            base_segment_index = pos[1];
+            
+            if (!base_segment_index) {
+            
+                report_at (program_name, 0, REPORT_WARNING, "%s: PUBDEF Base Frame is not supported", filename);
+                prefix += 2;
+            
+            }
+            
+            pubdef_name = pos + 2;
             
             while (pubdef_name != pubdef_name_end) {
             
-                pubdef_name_len = pubdef_name[2];
+                pubdef_name_len = pubdef_name[prefix - 1];
                 
-                public_offset = array_to_integer (pubdef_name + 3 + pubdef_name_len, 2);
-                symbol = of->symbol_arr + i_extdefs++;
-                
-                if (base_segment_index >= i_segments || !base_segment_index) {
-            
-                    report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: invalid base segment index %d", filename, base_segment_index);
-                    exit (EXIT_FAILURE);
-                
+                if (big_fields) {
+                    public_offset = array_to_integer (pubdef_name + prefix + pubdef_name_len, 4);
+                } else {
+                    public_offset = array_to_integer (pubdef_name + prefix + pubdef_name_len, 2);
                 }
                 
-                symbol->name = xstrndup ((char *) pubdef_name + 3, pubdef_name_len);
+                symbol = of->symbol_arr + i_pubdefs++;
+                
+                symbol->name = xstrndup ((char *) pubdef_name + prefix, pubdef_name_len);
                 symbol->value = public_offset;
                 symbol->part = part_p_array[base_segment_index];
                 symbol->section_number = base_segment_index;
                 
                 symbol_record_external_symbol (symbol);
-                pubdef_name = pubdef_name + 2 + 1 + pubdef_name_len + 1;
+                pubdef_name = pubdef_name + prefix + pubdef_name_len + suffix;
             
             }
         
@@ -298,13 +325,6 @@ void read_omf_object (const char *filename, unsigned char *data, unsigned long d
             
             unsigned long segment_len;
             
-            if (!(attributes & SEGMENT_ATTR_P)) {
-            
-                report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: OMF USE16 segments are not supported", filename);
-                exit (EXIT_FAILURE);
-            
-            }
-            
             if ((attributes >> 5) == 0) {
             
                 report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: OMF absolute segments are not supported", filename);
@@ -321,19 +341,21 @@ void read_omf_object (const char *filename, unsigned char *data, unsigned long d
             
             } else {
             
-                report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "%s: non big fields not supported for record %#x", filename, record_type);
-                exit (EXIT_FAILURE);
+                segment_len = array_to_integer (pos + 1, 2);
+                
+                segment_name_index = pos[3];
+                class_name_index = pos[4];
             
             }
             
-            if (segment_name_index >= i_lnames  || !segment_name_index) {
+            if (segment_name_index >= i_lnames || !segment_name_index) {
             
                 report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: invalid segment name index", filename);
                 exit (EXIT_FAILURE);
             
             }
             
-            if (class_name_index >= i_lnames  || !class_name_index) {
+            if (class_name_index >= i_lnames || !class_name_index) {
             
                 report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: invalid class name index", filename);
                 exit (EXIT_FAILURE);
@@ -415,13 +437,6 @@ void read_omf_object (const char *filename, unsigned char *data, unsigned long d
             
             }
             
-            if (!big_fields) {
-            
-                report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "%s: non big field not supported for record %#x", filename, record_type);
-                exit (EXIT_FAILURE);
-            
-            }
-            
             while (subrec != end) {
             
                 if (subrec[0] & 0x80) {
@@ -432,16 +447,19 @@ void read_omf_object (const char *filename, unsigned char *data, unsigned long d
                     unsigned char fixdat, frame_method, target_method;
                     unsigned short data_record_offset, target_datum;
                     
-                    if (subrec[0] & 0x40) {
+                    unsigned char loc;
+                    int bits;
                     
-                        report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "%s: only self-relative OMF fixups are supported", filename);
-                        exit (EXIT_FAILURE);
+                    /*seg_reloc = subrec[0] & 0x40;*/
+                    loc = subrec[0] >> 2;
                     
-                    }
+                    if ((loc & 0x0F) == 1) {
+                        bits = 16;
+                    } else if ((loc & 0x0F) == 9) {
+                        bits = 32;
+                    } else {
                     
-                    if (((subrec[0] >> 2) & 0x0f) != 9) {
-                    
-                        report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "%s: only 32-bit offset OMF fixups are supported", filename);
+                        report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "%s: only 16-bit/32-bit offset OMF fixups are supported", filename);
                         exit (EXIT_FAILURE);
                     
                     }
@@ -521,7 +539,12 @@ void read_omf_object (const char *filename, unsigned char *data, unsigned long d
                     
                     reloc->offset = data_record_offset;
                     reloc->addend = 0;
-                    reloc->howto = &reloc_howtos[RELOC_TYPE_PC32];
+                    
+                    if (bits == 16) {
+                        reloc->howto = &reloc_howtos[RELOC_TYPE_PC16];
+                    } else {
+                        reloc->howto = &reloc_howtos[RELOC_TYPE_PC32];
+                    }
                     
                     subrec += 4;
                 
@@ -546,12 +569,14 @@ void read_omf_object (const char *filename, unsigned char *data, unsigned long d
             if (big_fields) {
             
                 offset = array_to_integer (pos + 1, 4);
+                
                 size = record_len - 6;
                 data_bytes = pos + 5;
             
             } else {
             
                 offset = array_to_integer (pos + 1, 2);
+                
                 size = record_len - 4;
                 data_bytes = pos + 3;
             

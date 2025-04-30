@@ -44,6 +44,9 @@ struct msdos_header {
 #define     IMAGE_SUBSYSTEM_XBOX                            14
 #define     IMAGE_SUBSYSTEM_WINDOWS_BOOT_APPILCATION        16
 
+#define     IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE           0x0040
+#define     IMAGE_DLLCHARACTERISTICS_NX_COMPAT              0x0100
+
 struct pe_header {
 
     unsigned char Signature[4];
@@ -112,10 +115,6 @@ struct pe_optional_header {
     
     unsigned char LoaderFlags[4];
     unsigned char NumberOfRvaAndSizes[4];
-    
-    
-    /*unsigned char Reserved[128];*/
-    unsigned char Reserved[32 * 4];
 
 };
 

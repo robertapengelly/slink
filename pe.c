@@ -363,6 +363,10 @@ static void generate_base_relocation_block (struct section *reloc_section, struc
                     continue;
                 }
                 
+                if (part->rva + relocs[i].offset < array_to_integer (ibr_hdr_p->RVAOfBlock, 4)) {
+                    continue;
+                }
+                
                 rel_word  = (part->rva + relocs[i].offset - array_to_integer (ibr_hdr_p->RVAOfBlock, 4)) & 0xfff;
                 rel_word |= base_relocation_type << 12;
                 
@@ -699,6 +703,7 @@ void pe_write (const char *filename) {
     struct pe_optional_header *opthdr;
     
     struct section *section;
+    unsigned long size_of_optional_header;
     
     if (!(fp = fopen (filename, "wb"))) {
     
@@ -721,9 +726,10 @@ void pe_write (const char *filename) {
     write_sections (data);
     
     doshdr = (struct msdos_header *) data;
-    pehdr = (struct pe_header *) ((char *) doshdr + sizeof (*doshdr) + sizeof (dos_stub));
     
+    pehdr = (struct pe_header *) ((char *) doshdr + sizeof (*doshdr) + sizeof (dos_stub));
     opthdr = (struct pe_optional_header *) ((char *) pehdr + sizeof (*pehdr));
+    
     pos = (unsigned char *) opthdr + sizeof (*opthdr);
     
     doshdr->e_magic[0] = 'M';
@@ -749,7 +755,10 @@ void pe_write (const char *filename) {
     write721_to_byte_array (pehdr->Machine, IMAGE_FILE_MACHINE_I386);
     write721_to_byte_array (pehdr->NumberOfSections, section_count ());
     write741_to_byte_array (pehdr->TimeDateStamp, time (0));
-    write721_to_byte_array (pehdr->SizeOfOptionalHeader, sizeof (*opthdr));
+    
+    size_of_optional_header = sizeof (*opthdr);
+    size_of_optional_header += NUMBER_OF_DATA_DIRECTORIES * sizeof (struct pe_image_data_directory);
+    write721_to_byte_array (pehdr->SizeOfOptionalHeader, size_of_optional_header);
     
     {
     
@@ -796,11 +805,23 @@ void pe_write (const char *filename) {
     if (last_section) {
         write741_to_byte_array (opthdr->SizeOfImage, ALIGN (last_section->rva + last_section->total_size, section_alignment));
     } else {
-        write741_to_byte_array (opthdr->SizeOfImage, state->size_of_headers);
+        write741_to_byte_array (opthdr->SizeOfImage, ALIGN (state->size_of_headers, section_alignment));
     }
     
     write741_to_byte_array (opthdr->SizeOfHeaders, state->size_of_headers);
     write721_to_byte_array (opthdr->Subsystem, subsystem);
+    
+    {
+    
+        unsigned short characteristics = IMAGE_DLLCHARACTERISTICS_NX_COMPAT;
+        
+        if (can_be_relocated) {
+            characteristics |= IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE;
+        }
+        
+        write721_to_byte_array (opthdr->DllCharacteristics, characteristics);
+    
+    }
     
     {
     
@@ -831,6 +852,74 @@ void pe_write (const char *filename) {
     }
     
     write741_to_byte_array (opthdr->NumberOfRvaAndSizes, NUMBER_OF_DATA_DIRECTORIES);
+    
+    
+    {
+    
+        struct pe_image_data_directory *idd;
+        int i;
+        
+        for (i = 0; i < NUMBER_OF_DATA_DIRECTORIES; i++) {
+        
+            idd = (struct pe_image_data_directory *) pos;
+            
+            switch (i) {
+            
+                case 0:
+                
+                    /* EXPORT Table. */
+                    if ((section = section_find (".edata"))) {
+                    
+                        write741_to_byte_array (idd->VirtualAddress, section->rva);
+                        write741_to_byte_array (idd->Size, section->total_size);
+                    
+                    }
+                    
+                    break;
+                
+                case 1:
+                
+                    /* IMPORT Table. */
+                    if ((section = section_find (".idata"))) {
+                    
+                        write741_to_byte_array (idd->VirtualAddress, section->rva);
+                        write741_to_byte_array (idd->Size, section->total_size);
+                    
+                    }
+                    
+                    break;
+                
+                case 5:
+                
+                    /* BASE RELOCATION Table. */
+                    if ((section = section_find (".reloc"))) {
+                    
+                        write741_to_byte_array (idd->VirtualAddress, section->rva);
+                        write741_to_byte_array (idd->Size, section->total_size);
+                    
+                    }
+                    
+                    break;
+                
+                case 12:
+                
+                    /* IMPORT Address Table. */
+                    if ((section = section_find (".idata"))) {
+                    
+                        write741_to_byte_array (idd->VirtualAddress, iat_first_part->rva);
+                        write741_to_byte_array (idd->Size, iat_first_part->rva + iat_last_part->content_size);
+                    
+                    }
+                    
+                    break;
+            
+            }
+            
+            pos += sizeof (*idd);
+        
+        }
+    
+    }
     
     
     for (section = all_sections; section; section = section->next) {

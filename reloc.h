@@ -20,6 +20,7 @@ enum {
     RELOC_TYPE_8,
     RELOC_TYPE_PC8,
     
+    RELOC_TYPE_32_NO_BASE,
     RELOC_TYPE_END
 
 };

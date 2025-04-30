@@ -69,12 +69,15 @@ static int read_file_into_memory (const char *filename, unsigned char **memory_p
 
 static void read_object_file (const char *filename, unsigned char *data, unsigned long data_size) {
 
+    /*report_at (program_name, 0, REPORT_ERROR, "%s: signature: %#x:%#x", filename, data[0], data[1]);*/
     /*printf ("reading: %s\n", filename);*/
     
     if (data[0] == 0x01 && data[1] == 0x03) {
         read_elks_object (filename, data, data_size);
     } else if (data[0] == 0x07 && data[1] == 0x01) {
         read_aout_object (filename, data, data_size);
+    } else if (data[0] == 0x4C && data[1] == 0x01) {
+        read_coff_object (filename, data, data_size);
     } else if (data[0] == RECORD_TYPE_THEADR) {
         read_omf_object (filename, data, data_size);
     } else {
@@ -154,6 +157,16 @@ static void read_archive (const char *filename, unsigned char *data) {
             
             temp = xstrndup (hdr->name, sizeof (hdr->name));
             strip_trailing_spaces (temp);
+            
+            if (temp) {
+            
+                unsigned long member_name_len = strlen (temp);
+                
+                if (member_name_len && temp[member_name_len - 1] == '/' && temp[0] != '/') {
+                    temp[member_name_len - 1] = '\0';
+                }
+            
+            }
             
             name = xmalloc (strlen (filename) + 1 + strlen (temp) + 1 + 1);
             sprintf (name, "%s(%s)", filename, temp);
@@ -261,6 +274,8 @@ int main (int argc, char **argv) {
         }
     
     }
+    
+    sections_destroy_empty_before_collapse ();
     
     if (state->format == LD_FORMAT_I386_COFF) {
         coff_before_link ();

@@ -17,6 +17,424 @@
 #include    "section.h"
 #include    "write7x.h"
 
+struct string_table_header {
+    unsigned char StringTableSize[4];
+};
+
+struct symbol_table_entry {
+
+    unsigned char Name[8];
+    unsigned char value[4];
+    
+    unsigned char SectionNumber[2];
+    unsigned char Type[2];
+    
+    unsigned char StorageClass;
+    unsigned char NumberOfAuxSymbols;
+
+};
+
+static void translate_relocation (struct reloc_entry *reloc, struct coff_relocation_entry *input, struct section_part *part) {
+
+    reloc->symbol = part->of->symbol_arr + array_to_integer (input->SymbolTableIndex, 4);
+    reloc->offset = array_to_integer (input->VirtualAddress, 4);
+    
+    switch (array_to_integer (input->Type, 2)) {
+    
+        case IMAGE_REL_I386_ABSOLUTE:
+        
+            reloc->howto = &reloc_howtos[RELOC_TYPE_IGNORED];
+            break;
+        
+        case IMAGE_REL_I386_DIR16:
+        
+            reloc->howto = &reloc_howtos[RELOC_TYPE_16];
+            break;
+        
+        case IMAGE_REL_I386_DIR32:
+        
+            reloc->howto = &reloc_howtos[RELOC_TYPE_32];
+            break;
+        
+        case IMAGE_REL_I386_DIR32NB:
+        
+            reloc->howto = &reloc_howtos[RELOC_TYPE_32_NO_BASE];
+            break;
+        
+        case IMAGE_REL_I386_REL16:
+        
+            reloc->howto = &reloc_howtos[RELOC_TYPE_PC16];
+            break;
+        
+        case IMAGE_REL_I386_REL32:
+        
+            reloc->howto = &reloc_howtos[RELOC_TYPE_PC32];
+            break;
+    
+    }
+
+}
+
+static unsigned long translate_Characteristics_to_alignment (unsigned long Characteristics) {
+
+    unsigned long alignment = 1;
+    Characteristics &= IMAGE_SCN_ALIGN_8192BYTES;
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_1BYTES) {
+        alignment = 1;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_2BYTES) {
+        alignment = 2;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_4BYTES) {
+        alignment = 4;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_8BYTES) {
+        alignment = 8;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_16BYTES) {
+        alignment = 16;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_32BYTES) {
+        alignment = 32;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_64BYTES) {
+        alignment = 64;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_128BYTES) {
+        alignment = 128;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_256BYTES) {
+        alignment = 256;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_512BYTES) {
+        alignment = 512;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_1024BYTES) {
+        alignment = 1024;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_2048BYTES) {
+        alignment = 2048;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_4096BYTES) {
+        alignment = 4096;
+    }
+    
+    if (Characteristics == IMAGE_SCN_ALIGN_8192BYTES) {
+        alignment = 8192;
+    }
+    
+    return alignment;
+
+}
+
+static unsigned long translate_Characteristics_to_section_flags (unsigned long Characteristics) {
+
+    unsigned long flags = 0;
+    
+    if (!(Characteristics & IMAGE_SCN_MEM_WRITE)) {
+        flags |= SECTION_FLAG_READONLY;
+    }
+    
+    if (Characteristics & (IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_EXECUTE)) {
+        flags |= SECTION_FLAG_CODE;
+    }
+    
+    if (Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) {
+        flags |= SECTION_FLAG_DATA;
+    }
+    
+    if (Characteristics & IMAGE_SCN_TYPE_NOLOAD) {
+        flags |= SECTION_FLAG_NEVER_LOAD;
+    }
+    
+    if (Characteristics & IMAGE_SCN_LNK_INFO) {
+        flags |= SECTION_FLAG_DEBUGGING;
+    }
+    
+    if (Characteristics & IMAGE_SCN_LNK_REMOVE) {
+        flags |= SECTION_FLAG_EXCLUDE;
+    }
+    
+    if (!(Characteristics & IMAGE_SCN_MEM_READ)) {
+        flags |= SECTION_FLAG_NOREAD;
+    }
+    
+    if (Characteristics & IMAGE_SCN_MEM_SHARED) {
+        flags |= SECTION_FLAG_SHARED;
+    }
+    
+    if (Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA) {
+        flags |= SECTION_FLAG_ALLOC;
+    }
+    
+    return flags;
+
+}
+
+#define     IMAGE_SYM_DEBUG             -2
+
+#define     IMAGE_SYM_UNDEFINED         0
+#define     IMAGE_SYM_CLASS_EXTERNAL    2
+
+void read_coff_object (const char *filename, unsigned char *data, unsigned long data_size) {
+
+    struct coff_header *coff_hdr;
+    struct coff_relocation_entry *reloc_info;
+    
+    struct coff_section_table_entry *section_hdr;
+    struct string_table_header *string_table_hdr;
+    
+    struct section_part **part_p_array, *part;
+    struct object_file *of;
+    
+    struct section *section;
+    struct subsection *subsection;
+    
+    char *string_table = 0, *section_name, *p;
+    unsigned long string_table_size, no_sections, no_syms;
+    
+    unsigned char *pos = (unsigned char *) data;
+    unsigned long i;
+    
+    struct section_part *bss_part = 0;
+    long bss_section_number;
+    
+    if ((pos - data + sizeof (*coff_hdr) > data_size) || pos < data) {
+    
+        report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: corrupted input file", filename);
+        return;
+    
+    }
+    
+    coff_hdr = (struct coff_header *) data;
+    
+    pos = (unsigned char *) data + array_to_integer (coff_hdr->PointerToSymbolTable, 4) + sizeof (struct symbol_table_entry) * array_to_integer (coff_hdr->NumberOfSymbols, 4);
+    string_table_hdr = (struct string_table_header *) pos;
+    
+    if ((string_table_size = array_to_integer (string_table_hdr->StringTableSize, 4)) < 4) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "%s: invalid string table size: %lu", filename, string_table_size);
+        return;
+    
+    }
+    
+    string_table = (char *) pos;
+    
+    part_p_array = xmalloc (sizeof (*part_p_array) * (array_to_integer (coff_hdr->NumberOfSections, 2) + 1));
+    of = object_file_make (filename, array_to_integer (coff_hdr->NumberOfSymbols, 4));
+    
+    no_sections = array_to_integer (coff_hdr->NumberOfSections, 2);
+    
+    for (i = 0; i < no_sections; i++) {
+    
+        section_hdr = (struct coff_section_table_entry *) ((unsigned char *) data + sizeof (struct coff_header) + sizeof (struct coff_section_table_entry) * i);
+        
+        if ((array_to_integer (section_hdr->Characteristics, 4) & IMAGE_SCN_LNK_REMOVE)) {
+        
+            part_p_array[i + 1] = 0;
+            continue;
+        
+        }
+        
+        section_name = xstrndup (section_hdr->Name, 8);
+        
+        if (section_name[0] == '/') {
+        
+            unsigned long offset = strtoul (section_name + 1, NULL, 10);
+            
+            if (offset < array_to_integer (string_table_hdr->StringTableSize, 4)) {
+            
+                free (section_name);
+                section_name = xstrdup (string_table + offset);
+            
+            } else {
+                report_at (program_name, 0, REPORT_ERROR, "%s: invalid offset into string table", filename);
+            }
+        
+        }
+        
+        if ((p = strchr (section_name, '$'))) {
+            *p++ = '\0';
+        }
+        
+        section = section_find_or_make (section_name);
+        section->flags = translate_Characteristics_to_section_flags (array_to_integer (section_hdr->Characteristics, 4));
+        
+        if (array_to_integer (section_hdr->PointerToRawData, 4) == 0 && array_to_integer (section_hdr->SizeOfRawData, 4)) {
+            section->is_bss = 1;
+        }
+        
+        subsection = (p ? subsection_find_or_make (section, p) : 0);
+        free (section_name);
+        
+        part = section_part_new (section, of);
+        part->alignment = translate_Characteristics_to_alignment (array_to_integer (section_hdr->Characteristics, 4));
+        part->content_size = array_to_integer (section_hdr->SizeOfRawData, 4);
+        
+        if (array_to_integer (section_hdr->PointerToRawData, 4)) {
+        
+            pos = (unsigned char *) data + array_to_integer (section_hdr->PointerToRawData, 4);
+            
+            part->content = xmalloc (part->content_size);
+            memcpy (part->content, pos, part->content_size);
+        
+        }
+        
+        if (array_to_integer (section_hdr->PointerToRelocations, 4) && array_to_integer (section_hdr->NumberOfRelocations, 2)) {
+        
+            unsigned long j, no_relocs;
+            
+            if (!array_to_integer (section_hdr->PointerToRawData, 4)) {
+            
+                report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: section '%s' is BSS but has relocations", filename, section->name);
+                exit (EXIT_FAILURE);
+            
+            }
+            
+            pos = (unsigned char *) data + array_to_integer (section_hdr->PointerToRelocations, 4);
+            
+            part->reloc_arr = xmalloc (sizeof (struct reloc_entry) * array_to_integer (section_hdr->NumberOfRelocations, 2));
+            part->reloc_cnt = array_to_integer (section_hdr->NumberOfRelocations, 2);
+            
+            no_relocs = array_to_integer (section_hdr->NumberOfRelocations, 2);
+            
+            for (j = 0; j < no_relocs; j++) {
+            
+                reloc_info = (struct coff_relocation_entry *) (pos + (sizeof (*reloc_info) * j));
+                translate_relocation (part->reloc_arr + j, reloc_info, part);
+            
+            }
+        
+        }
+        
+        if (subsection) {
+            subsection_append_section_part (subsection, part);
+        } else {
+            section_append_section_part (section, part);
+        }
+        
+        part_p_array[i + 1] = part;
+    
+    }
+    
+    no_syms = array_to_integer (coff_hdr->NumberOfSymbols, 4);
+    
+    for (i = 0; i < no_syms; i++) {
+    
+        struct symbol_table_entry *coff_symbol;
+        struct symbol *symbol = of->symbol_arr + i;
+        
+        int section_no, no_sections;
+        coff_symbol = (struct symbol_table_entry *) ((unsigned char *) data + array_to_integer (coff_hdr->PointerToSymbolTable, 4) + sizeof (struct symbol_table_entry) * i);
+        
+        if (memcmp (coff_symbol->Name, "\0\0\0\0", 4) == 0) {
+        
+            unsigned long offset = array_to_integer (coff_symbol->Name + 4, 4);
+            
+            if (offset < array_to_integer (string_table_hdr->StringTableSize, 4)) {
+                symbol->name = xstrdup (string_table + offset);
+            } else {
+            
+                report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: invalid offset into string table", filename);
+                exit (EXIT_FAILURE);
+            
+            }
+        
+        } else {
+            symbol->name = xstrndup ((char *) coff_symbol->Name, 8);
+        }
+        
+        symbol->value = array_to_integer (coff_symbol->value, 4);
+        symbol->section_number = array_to_integer (coff_symbol->SectionNumber, 2);
+        
+        section_no = array_to_integer (coff_symbol->SectionNumber, 2);
+        no_sections = array_to_integer (coff_hdr->NumberOfSections, 2);
+        
+        if (symbol->section_number == IMAGE_SYM_UNDEFINED) {
+        
+            if (symbol->value) {
+            
+                if (!bss_part) {
+                
+                    struct section *section = section_find_or_make (".bss");
+                    
+                    section->flags = translate_Characteristics_to_section_flags (IMAGE_SCN_CNT_UNINITIALIZED_DATA | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE);
+                    section->is_bss = 1;
+                    
+                    bss_section_number = array_to_integer (coff_hdr->NumberOfSections, 2) ? array_to_integer (coff_hdr->NumberOfSections, 2) : 1;
+                    
+                    bss_part = section_part_new (section, of);
+                    bss_part->content_size = 0;
+                    
+                    section_append_section_part (section, bss_part);
+                
+                }
+                
+                bss_part->content_size += symbol->value;
+                symbol->part = bss_part;
+                
+                symbol->value = bss_part->content_size - symbol->value;
+                symbol->section_number = bss_section_number;
+            
+            } else {
+                symbol->part = 0;
+            }
+        
+        } else if (section_no > 0 && section_no <= no_sections) {
+            symbol->part = part_p_array[section_no];
+        } else if (section_no == IMAGE_SYM_UNDEFINED || section_no == IMAGE_SYM_DEBUG) {
+            symbol->part = 0;
+        } else if (section_no > no_sections) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "%s: invalid symbol SectionNumber: %hi", filename, section_no);
+            symbol->part = 0;
+        
+        } else {
+        
+            report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "+++not yet supported symbol SectionNumber: %hi", section_no);
+            exit (EXIT_FAILURE);
+        
+        }
+        
+        symbol->section_number = section_no;
+        
+        if (coff_symbol->StorageClass == IMAGE_SYM_CLASS_EXTERNAL) {
+            symbol_record_external_symbol (symbol);
+        }
+        
+        if (coff_symbol->NumberOfAuxSymbols) {
+        
+            for (i++; coff_symbol->NumberOfAuxSymbols; coff_symbol->NumberOfAuxSymbols--) {
+            
+                symbol = of->symbol_arr + i;
+                
+                memset (symbol, 0, sizeof (*symbol));
+                symbol->auxiliary = 1;
+            
+            }
+        
+        }
+    
+    }
+    
+    free (part_p_array);
+
+}
+
+
 struct exclude_symbol {
 
     char *name;

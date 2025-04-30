@@ -99,6 +99,8 @@ void section_write (struct section *section, unsigned char *memory);
 int section_count (void);
 
 struct subsection *subsection_find (struct section *section, const char *name);
+struct subsection *subsection_find_or_make (struct section *section, const char *name);
+
 void subsection_append_section_part (struct subsection *subsection, struct section_part *part);
 
 #endif      /* _SECTION_H */
