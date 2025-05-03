@@ -95,15 +95,62 @@ struct offset_name_table {
 
 #define     ALREADY_READ                "Already read"
 
+static void read_archive_memeber (unsigned char *pos, const char *filename) {
+
+    struct ar_header *hdr = (struct ar_header *) pos;
+    
+    char *temp, *name;
+    unsigned long data_size;
+    
+    if (memcmp (pos, ALREADY_READ, sizeof (ALREADY_READ)) == 0) {
+        return;
+    }
+    
+    hdr = (struct ar_header *) pos;
+    
+    temp = xstrndup (hdr->name, sizeof (hdr->name));
+    strip_trailing_spaces (temp);
+    
+    if (temp) {
+    
+        unsigned long member_name_len = strlen (temp);
+        
+        if (member_name_len && temp[member_name_len - 1] == '/' && temp[0] != '/') {
+            temp[member_name_len - 1] = '\0';
+        }
+    
+    }
+    
+    name = xmalloc (strlen (filename) + 1 + strlen (temp) + 1 + 1);
+    sprintf (name, "%s(%s)", filename, temp);
+    
+    free (temp);
+    
+    temp = xstrndup (hdr->size, sizeof (hdr->size));
+    strip_trailing_spaces (temp);
+    
+    data_size = strtoul (temp, NULL, 10);
+    free (temp);
+    
+    read_object_file (name, pos + sizeof (*hdr), data_size);
+    free (name);
+    
+    memcpy (pos, ALREADY_READ, sizeof (ALREADY_READ));
+
+}
+
 static void read_archive (const char *filename, unsigned char *data) {
 
     unsigned char *pos = data + 8;
+    
     struct ar_header *hdr = (struct ar_header *) pos;
-    
     struct offset_name_table *offset_name_table;
-    char *name, *temp, *string_table_pos;
     
-    unsigned long no_symbols, data_size, i;
+    char *string_table_pos, *name;
+    unsigned long no_symbols, i;
+    
+    unsigned long start_header_object_offset = 0;
+    unsigned long end_header_object_offset = 0;
     
     name = xstrndup (hdr->name, sizeof (hdr->name));
     strip_trailing_spaces (name);
@@ -129,11 +176,25 @@ static void read_archive (const char *filename, unsigned char *data) {
     for (i = 0; i < no_symbols; i++) {
     
         offset_name_table[i].offset = byte_array_to_integer (pos, 4, 1);
-        pos += 4;
-        
         offset_name_table[i].name = (char *) string_table_pos;
+        
         string_table_pos += strlen (offset_name_table[i].name) + 1;
+        pos += 4;
     
+    }
+    
+    for (i = 0; i < no_symbols && (!start_header_object_offset || !end_header_object_offset); i++) {
+    
+        if (strncmp (offset_name_table[i].name, "__head_", 7) == 0) {
+            start_header_object_offset = offset_name_table[i].offset;
+        } else if (strlen (offset_name_table[i].name) > 6 && strcmp (offset_name_table[i].name + strlen (offset_name_table[i].name) - 6, "_iname") == 0) {
+            end_header_object_offset = offset_name_table[i].offset;
+        }
+    
+    }
+    
+    if (start_header_object_offset) {
+        read_archive_memeber (data + start_header_object_offset, filename);
     }
     
     while (1) {
@@ -147,42 +208,11 @@ static void read_archive (const char *filename, unsigned char *data) {
                 continue;
             }
             
-            pos = data + offset_name_table[i].offset;
-            
-            if (memcmp (pos, ALREADY_READ, sizeof (ALREADY_READ)) == 0) {
+            if (offset_name_table[i].offset == start_header_object_offset || offset_name_table[i].offset == end_header_object_offset) {
                 continue;
             }
             
-            hdr = (struct ar_header *) pos;
-            
-            temp = xstrndup (hdr->name, sizeof (hdr->name));
-            strip_trailing_spaces (temp);
-            
-            if (temp) {
-            
-                unsigned long member_name_len = strlen (temp);
-                
-                if (member_name_len && temp[member_name_len - 1] == '/' && temp[0] != '/') {
-                    temp[member_name_len - 1] = '\0';
-                }
-            
-            }
-            
-            name = xmalloc (strlen (filename) + 1 + strlen (temp) + 1 + 1);
-            sprintf (name, "%s(%s)", filename, temp);
-            
-            free (temp);
-            
-            temp = xstrndup (hdr->size, sizeof (hdr->size));
-            strip_trailing_spaces (temp);
-            
-            data_size = strtoul (temp, NULL, 10);
-            free (temp);
-            
-            read_object_file (name, pos + sizeof (*hdr), data_size);
-            free (name);
-            
-            memcpy (pos, ALREADY_READ, sizeof (ALREADY_READ));
+            read_archive_memeber (data + offset_name_table[i].offset, filename);
             change = 1;
         
         }
@@ -191,6 +221,10 @@ static void read_archive (const char *filename, unsigned char *data) {
             break;
         }
     
+    }
+    
+    if (end_header_object_offset) {
+        read_archive_memeber (data + end_header_object_offset, filename);
     }
     
     free (offset_name_table);
@@ -274,8 +308,6 @@ int main (int argc, char **argv) {
         }
     
     }
-    
-    sections_destroy_empty_before_collapse ();
     
     if (state->format == LD_FORMAT_I386_COFF) {
         coff_before_link ();

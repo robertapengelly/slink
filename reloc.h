@@ -9,15 +9,13 @@ enum {
     RELOC_TYPE_IGNORED,
     
     RELOC_TYPE_64,
-    RELOC_TYPE_PC64,
-    
     RELOC_TYPE_32,
-    RELOC_TYPE_PC32,
-    
     RELOC_TYPE_16,
-    RELOC_TYPE_PC16,
-    
     RELOC_TYPE_8,
+    
+    RELOC_TYPE_PC64,
+    RELOC_TYPE_PC32,
+    RELOC_TYPE_PC16,
     RELOC_TYPE_PC8,
     
     RELOC_TYPE_32_NO_BASE,

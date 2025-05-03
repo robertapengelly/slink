@@ -664,27 +664,19 @@ void pe_before_link (void) {
     
     part = section_part_new (section, object_file_make (FAKE_LD_FILENAME, 0));
     
-    part->content_size = sizeof (struct pe_import_directory_table);
-    part->content = xmalloc (part->content_size);
-    
+    part->content = xmalloc (part->content_size = sizeof (struct pe_import_directory_table));
     subsection_append_section_part (subsection, part);
     
     if (!(subsection = subsection_find (section, "5"))) {
         return;
     }
     
-    iat_first_part = subsection->first_part;
-    
-    if (!iat_first_part) {
+    if (!(iat_first_part = subsection->first_part)) {
         return;
     }
     
-    for (part = iat_first_part; ; part = part->next) {
-    
-        if (!part->next) {
-            break;
-        }
-    
+    for (part = iat_first_part; part->next; part = part->next) {
+        ;
     }
     
     iat_last_part = part;
@@ -904,10 +896,10 @@ void pe_write (const char *filename) {
                 case 12:
                 
                     /* IMPORT Address Table. */
-                    if ((section = section_find (".idata"))) {
+                    if ((section = section_find (".idata")) && iat_first_part) {
                     
                         write741_to_byte_array (idd->VirtualAddress, iat_first_part->rva);
-                        write741_to_byte_array (idd->Size, iat_first_part->rva + iat_last_part->content_size);
+                        write741_to_byte_array (idd->Size, iat_last_part->rva + iat_last_part->content_size - iat_first_part->rva);
                     
                     }
                     

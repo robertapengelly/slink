@@ -70,6 +70,12 @@ static void translate_relocation (struct reloc_entry *reloc, struct coff_relocat
         
             reloc->howto = &reloc_howtos[RELOC_TYPE_PC32];
             break;
+        
+        default:
+        
+            /* There is no point in continuing, the object is broken. */
+            report_at (program_name, 0, REPORT_FATAL_ERROR, "invalid relocation type 0x%04hx (origin object '%s')", array_to_integer (input->Type, 2), part->of->filename);
+            exit (EXIT_FAILURE);
     
     }
 
@@ -187,6 +193,7 @@ static unsigned long translate_Characteristics_to_section_flags (unsigned long C
 #define     IMAGE_SYM_DEBUG             -2
 
 #define     IMAGE_SYM_UNDEFINED         0
+#define     IMAGE_SYM_ABSOLUTE          1
 #define     IMAGE_SYM_CLASS_EXTERNAL    2
 
 void read_coff_object (const char *filename, unsigned char *data, unsigned long data_size) {
@@ -210,7 +217,9 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
     unsigned long i;
     
     struct section_part *bss_part = 0;
-    long bss_section_number;
+    struct section *bss_section = 0;
+    
+    long bss_section_number = 0;
     
     if ((pos - data + sizeof (*coff_hdr) > data_size) || pos < data) {
     
@@ -240,15 +249,7 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
     
     for (i = 0; i < no_sections; i++) {
     
-        section_hdr = (struct coff_section_table_entry *) ((unsigned char *) data + sizeof (struct coff_header) + sizeof (struct coff_section_table_entry) * i);
-        
-        if ((array_to_integer (section_hdr->Characteristics, 4) & IMAGE_SCN_LNK_REMOVE)) {
-        
-            part_p_array[i + 1] = 0;
-            continue;
-        
-        }
-        
+        section_hdr = (struct coff_section_table_entry *) (pos = (unsigned char *) data + sizeof (struct coff_header) + sizeof (struct coff_section_table_entry) * i);
         section_name = xstrndup (section_hdr->Name, 8);
         
         if (section_name[0] == '/') {
@@ -270,6 +271,15 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
             *p++ = '\0';
         }
         
+        if (array_to_integer (section_hdr->Characteristics, 4) & IMAGE_SCN_LNK_REMOVE) {
+        
+            part_p_array[i + 1] = 0;
+            
+            free (section_name);
+            continue;
+        
+        }
+        
         section = section_find_or_make (section_name);
         section->flags = translate_Characteristics_to_section_flags (array_to_integer (section_hdr->Characteristics, 4));
         
@@ -277,7 +287,12 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
             section->is_bss = 1;
         }
         
-        subsection = (p ? subsection_find_or_make (section, p) : 0);
+        if (p) {
+            subsection = subsection_find_or_make (section, p);
+        } else {
+            subsection = 0;
+        }
+        
         free (section_name);
         
         part = section_part_new (section, of);
@@ -290,6 +305,13 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
             
             part->content = xmalloc (part->content_size);
             memcpy (part->content, pos, part->content_size);
+        
+        }
+        
+        if (section->is_bss) {
+        
+            bss_section_number = i + 1;
+            bss_section = section;
         
         }
         
@@ -337,7 +359,7 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         struct symbol_table_entry *coff_symbol;
         struct symbol *symbol = of->symbol_arr + i;
         
-        int section_no, no_sections;
+        short section_no, no_sections;
         coff_symbol = (struct symbol_table_entry *) ((unsigned char *) data + array_to_integer (coff_hdr->PointerToSymbolTable, 4) + sizeof (struct symbol_table_entry) * i);
         
         if (memcmp (coff_symbol->Name, "\0\0\0\0", 4) == 0) {
@@ -357,37 +379,52 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
             symbol->name = xstrndup ((char *) coff_symbol->Name, 8);
         }
         
-        symbol->value = array_to_integer (coff_symbol->value, 4);
-        symbol->section_number = array_to_integer (coff_symbol->SectionNumber, 2);
-        
         section_no = array_to_integer (coff_symbol->SectionNumber, 2);
+        
+        symbol->value = array_to_integer (coff_symbol->value, 4);
+        symbol->size = 0;
+        symbol->section_number = section_no;
+        
         no_sections = array_to_integer (coff_hdr->NumberOfSections, 2);
         
-        if (symbol->section_number == IMAGE_SYM_UNDEFINED) {
+        if (section_no == IMAGE_SYM_UNDEFINED) {
         
             if (symbol->value) {
             
-                if (!bss_part) {
+                struct symbol *old_symbol = symbol_find (symbol->name);
                 
-                    struct section *section = section_find_or_make (".bss");
+                if (!old_symbol || symbol_is_undefined (old_symbol)) {
+                
+                    if (bss_section) {
                     
-                    section->flags = translate_Characteristics_to_section_flags (IMAGE_SCN_CNT_UNINITIALIZED_DATA | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE);
-                    section->is_bss = 1;
+                        bss_section = section_find_or_make (".bss");
+                        
+                        bss_section->flags = translate_Characteristics_to_section_flags (IMAGE_SCN_CNT_UNINITIALIZED_DATA | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE);
+                        bss_section->is_bss = 1;
+                        
+                        bss_section_number = array_to_integer (coff_hdr->NumberOfSections, 2) ? array_to_integer (coff_hdr->NumberOfSections, 2) : 1;
                     
-                    bss_section_number = array_to_integer (coff_hdr->NumberOfSections, 2) ? array_to_integer (coff_hdr->NumberOfSections, 2) : 1;
+                    }
                     
-                    bss_part = section_part_new (section, of);
-                    bss_part->content_size = 0;
+                    bss_part = section_part_new (bss_section, of);
+                    section_append_section_part (bss_section, bss_part);
                     
-                    section_append_section_part (section, bss_part);
+                    bss_part->content_size = symbol->size - symbol->value;
+                    
+                    symbol->part = bss_part;
+                    symbol->value = 0;
+                    symbol->section_number = bss_section_number;
+                
+                } else {
+                
+                    if (symbol->value > old_symbol->size) {
+                        old_symbol->part->content_size = old_symbol->size = symbol->value;
+                    }
+                    
+                    symbol->value = 0;
+                    symbol->part = 0;
                 
                 }
-                
-                bss_part->content_size += symbol->value;
-                symbol->part = bss_part;
-                
-                symbol->value = bss_part->content_size - symbol->value;
-                symbol->section_number = bss_section_number;
             
             } else {
                 symbol->part = 0;
@@ -395,8 +432,11 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         
         } else if (section_no > 0 && section_no <= no_sections) {
             symbol->part = part_p_array[section_no];
-        } else if (section_no == IMAGE_SYM_UNDEFINED || section_no == IMAGE_SYM_DEBUG) {
+        } else if (section_no == IMAGE_SYM_ABSOLUTE || section_no == IMAGE_SYM_DEBUG) {
+        
+            symbol->section_number = section_no;
             symbol->part = 0;
+        
         } else if (section_no > no_sections) {
         
             report_at (program_name, 0, REPORT_ERROR, "%s: invalid symbol SectionNumber: %hi", filename, section_no);
@@ -409,22 +449,24 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         
         }
         
-        symbol->section_number = section_no;
-        
-        if (coff_symbol->StorageClass == IMAGE_SYM_CLASS_EXTERNAL) {
+        if (coff_symbol->StorageClass == IMAGE_SYM_CLASS_EXTERNAL || section_no == IMAGE_SYM_UNDEFINED) {
             symbol_record_external_symbol (symbol);
         }
         
         if (coff_symbol->NumberOfAuxSymbols) {
         
-            for (i++; coff_symbol->NumberOfAuxSymbols; coff_symbol->NumberOfAuxSymbols--) {
+            unsigned long j;
             
-                symbol = of->symbol_arr + i;
+            for (j = 0; j < coff_symbol->NumberOfAuxSymbols; j++) {
+            
+                symbol = of->symbol_arr + i + 1 + j;
                 
                 memset (symbol, 0, sizeof (*symbol));
                 symbol->auxiliary = 1;
             
             }
+            
+            i += coff_symbol->NumberOfAuxSymbols;
         
         }
     

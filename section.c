@@ -14,14 +14,13 @@ static struct section **last_section_p = &all_sections;
 
 static struct section *discarded_sections = 0;
 
-struct object_file *object_file_make (const char *filename, unsigned long symbol_cnt) {
+struct object_file *object_file_make (const char *filename, unsigned long symbol_count) {
 
     struct object_file *of = xmalloc (sizeof (*of));
-    
     of->filename = xstrdup (filename);
     
-    of->symbol_arr = symbol_cnt ? xmalloc (sizeof (*of->symbol_arr) * symbol_cnt) : 0;
-    of->symbol_cnt = symbol_cnt;
+    of->symbol_arr = symbol_count ? xmalloc (sizeof (*of->symbol_arr) * symbol_count) : 0;
+    of->symbol_cnt = symbol_count;
     
     *last_object_file_p = of;
     last_object_file_p = &of->next;
@@ -89,8 +88,8 @@ void section_append_section_part (struct section *section, struct section_part *
 void sections_destroy_empty_before_collapse (void) {
 
     struct section *section, **next_p;
-    
     struct section_part *part;
+    
     struct subsection *subsection;
     
     for (next_p = &all_sections, section = *next_p; section; section = *next_p) {
@@ -140,12 +139,8 @@ void section_write (struct section *section, unsigned char *memory) {
     
     for (part = section->first_part; part; part = part->next) {
     
-        if (part->content_size > 0) {
-        
-            memcpy (memory, part->content, part->content_size);
-            memory += part->content_size;
-        
-        }
+        memcpy (memory, part->content, part->content_size);
+        memory += part->content_size;
     
     }
 
@@ -197,9 +192,9 @@ struct subsection *subsection_find_or_make (struct section *section, const char 
         subsection = xmalloc (sizeof (*subsection));
         
         subsection->name = xstrdup (name);
-        subsection->next = *next_p;
         subsection->last_part_p = &subsection->first_part;
         
+        subsection->next = *next_p;
         *next_p = subsection;
     
     }

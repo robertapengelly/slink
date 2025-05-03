@@ -16,19 +16,19 @@
 
 struct reloc_howto reloc_howtos[RELOC_TYPE_END] = {
 
-    {   0,  0,  0,  0,  0,  "RELOC_TYPE_IGNORED",   0,  0   },
+    {   0,  0,  0,  0,  0,  "RELOC_TYPE_IGNORED",       0,  0   },
     
-    {   8,  0,  0,  0,  0,  "RELOC_TYPE_64",        0,  0   },
-    {   8,  1,  0,  0,  0,  "RELOC_TYPE_PC64",      0,  0   },
+    {   8,  0,  0,  0,  0,  "RELOC_TYPE_64",            0,  0   },
+    {   4,  0,  0,  0,  0,  "RELOC_TYPE_32",            0,  0   },
+    {   2,  0,  0,  0,  0,  "RELOC_TYPE_16",            0,  0   },
+    {   1,  0,  0,  0,  0,  "RELOC_TYPE_8",             0,  0   },
     
-    {   4,  0,  0,  0,  0,  "RELOC_TYPE_32",        0,  0   },
-    {   4,  1,  0,  0,  0,  "RELOC_TYPE_PC32",      0,  0   },
+    {   8,  1,  0,  0,  0,  "RELOC_TYPE_PC64",          0,  0   },
+    {   4,  1,  0,  0,  0,  "RELOC_TYPE_PC32",          0,  0   },
+    {   2,  1,  0,  0,  0,  "RELOC_TYPE_PC16",          0,  0   },
+    {   1,  1,  0,  0,  0,  "RELOC_TYPE_PC8",           0,  0   },
     
-    {   2,  0,  0,  0,  0,  "RELOC_TYPE_16",        0,  0   },
-    {   2,  1,  0,  0,  0,  "RELOC_TYPE_PC16",      0,  0   },
-    
-    {   1,  0,  0,  0,  0,  "RELOC_TYPE_8",         0,  0   },
-    {   1,  1,  0,  0,  0,  "RELOC_TYPE_PC8",       0,  0   }
+    {   4,  0,  1,  0,  0,  "RELOC_TYPE_32_NO_BASE",    0,  0   }
 
 };
 
