@@ -67,22 +67,41 @@ static int read_file_into_memory (const char *filename, unsigned char **memory_p
 
 }
 
-static void read_object_file (const char *filename, unsigned char *data, unsigned long data_size) {
+static int read_object_file (const char *filename, unsigned char *data, unsigned long data_size) {
 
     /*report_at (program_name, 0, REPORT_ERROR, "%s: signature: %#x:%#x", filename, data[0], data[1]);*/
     /*printf ("reading: %s\n", filename);*/
     
     if (data[0] == 0x01 && data[1] == 0x03) {
+    
         read_elks_object (filename, data, data_size);
-    } else if (data[0] == 0x07 && data[1] == 0x01) {
-        read_aout_object (filename, data, data_size);
-    } else if (data[0] == 0x4C && data[1] == 0x01) {
-        read_coff_object (filename, data, data_size);
-    } else if (data[0] == RECORD_TYPE_THEADR) {
-        read_omf_object (filename, data, data_size);
-    } else {
-        report_at (program_name, 0, REPORT_ERROR, "%s: unrecognised file format", filename);
+        return 0;
+    
     }
+    
+    if (data[0] == 0x07 && data[1] == 0x01) {
+    
+        read_aout_object (filename, data, data_size);
+        return 0;
+    
+    }
+    
+    if (data[0] == 0x4C && data[1] == 0x01) {
+    
+        read_coff_object (filename, data, data_size);
+        return 0;
+    
+    }
+    
+    if (data[0] == RECORD_TYPE_THEADR) {
+    
+        read_omf_object (filename, data, data_size);
+        return 0;
+    
+    }
+    
+    report_at (program_name, 0, REPORT_ERROR, "%s: unrecognised file format", filename);
+    return 1;
 
 }
 
@@ -95,15 +114,17 @@ struct offset_name_table {
 
 #define     ALREADY_READ                "Already read"
 
-static void read_archive_memeber (unsigned char *pos, const char *filename) {
+static int read_archive_memeber (unsigned char *pos, const char *filename) {
 
     struct ar_header *hdr = (struct ar_header *) pos;
     
     char *temp, *name;
     unsigned long data_size;
     
+    int ret;
+    
     if (memcmp (pos, ALREADY_READ, sizeof (ALREADY_READ)) == 0) {
-        return;
+        return 0;
     }
     
     hdr = (struct ar_header *) pos;
@@ -132,10 +153,11 @@ static void read_archive_memeber (unsigned char *pos, const char *filename) {
     data_size = strtoul (temp, NULL, 10);
     free (temp);
     
-    read_object_file (name, pos + sizeof (*hdr), data_size);
+    ret = read_object_file (name, pos + sizeof (*hdr), data_size);
     free (name);
     
     memcpy (pos, ALREADY_READ, sizeof (ALREADY_READ));
+    return ret;
 
 }
 
@@ -212,8 +234,9 @@ static void read_archive (const char *filename, unsigned char *data) {
                 continue;
             }
             
-            read_archive_memeber (data + offset_name_table[i].offset, filename);
-            change = 1;
+            if (!read_archive_memeber (data + offset_name_table[i].offset, filename)) {
+                change = 1;
+            }
         
         }
         
