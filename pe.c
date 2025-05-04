@@ -1145,8 +1145,8 @@ static void import_generate_import (const char *import_name, short ordinal_hint,
 
 /**
  * According to https://oldweb.today/?browser=ie6#19830101000000/https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
- * the earliest archive that's available is from 2022 (date doesn't seem to be visible if you use firfox 10) so the presece of
- * the dll name in the short entries may not always be present for for now as link.exe that's available with Visual Studio 2010
+ * the earliest archive that's available is from 2022 (date doesn't seem to be visible if you use firfox 10) so the presence of
+ * the dll name in the short entries may not always be present but for now as link.exe that's available with Visual Studio 2010
  * includes it I'll assume that it's always been present for now.
  */
 char *current_import_dll_name = 0;
