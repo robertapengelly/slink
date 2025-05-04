@@ -190,10 +190,10 @@ static unsigned long translate_Characteristics_to_section_flags (unsigned long C
 
 }
 
+#define     IMAGE_SYM_ABSOLUTE          -1
 #define     IMAGE_SYM_DEBUG             -2
 
 #define     IMAGE_SYM_UNDEFINED         0
-#define     IMAGE_SYM_ABSOLUTE          1
 #define     IMAGE_SYM_CLASS_EXTERNAL    2
 
 void read_coff_object (const char *filename, unsigned char *data, unsigned long data_size) {
@@ -351,15 +351,15 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         part_p_array[i + 1] = part;
     
     }
-    
     no_syms = array_to_integer (coff_hdr->NumberOfSymbols, 4);
     
     for (i = 0; i < no_syms; i++) {
     
-        struct symbol_table_entry *coff_symbol;
         struct symbol *symbol = of->symbol_arr + i;
         
+        struct symbol_table_entry *coff_symbol;
         short section_no, no_sections;
+        
         coff_symbol = (struct symbol_table_entry *) ((unsigned char *) data + array_to_integer (coff_hdr->PointerToSymbolTable, 4) + sizeof (struct symbol_table_entry) * i);
         
         if (memcmp (coff_symbol->Name, "\0\0\0\0", 4) == 0) {
@@ -395,7 +395,7 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
                 
                 if (!old_symbol || symbol_is_undefined (old_symbol)) {
                 
-                    if (bss_section) {
+                    if (!bss_section) {
                     
                         bss_section = section_find_or_make (".bss");
                         

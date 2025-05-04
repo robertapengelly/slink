@@ -203,4 +203,7 @@ void pe_print_help (void);
 void pe_write (const char *filename);
 void pe_use_option (const char *cmd_arg, int idx, const char *optarg);
 
+void pe_archive_end (void);
+void read_pe_import_library (const char *filename, unsigned char *data);
+
 #endif      /* _PE_H */

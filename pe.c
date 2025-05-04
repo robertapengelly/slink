@@ -955,3 +955,362 @@ unsigned long pe_get_first_section_rva (void) {
 unsigned long pe_align_to_file_alignment (unsigned long value) {
     return ALIGN (value, file_alignment);
 }
+
+struct import_library_header {
+
+    unsigned char Magic1[2];
+    unsigned char Magic2[2];
+    unsigned char Version[2];
+    unsigned char Machine[2];
+    unsigned char TimeDateStamp[4];
+    unsigned char SizeOfData[4];
+    unsigned char OrdinalHint[2];
+    unsigned char Type[2];
+
+};
+
+#define     IMPORT_CODE                 0
+#define     IMPORT_DATA                 1
+#define     IMPORT_CONST                2
+
+#define     IMPORT_ORDINAL              0
+#define     IMPORT_NAME                 1
+#define     IMPORT_NAME_NOPREFIX        2
+#define     IMPORT_NAME_UNDECORATE      3
+
+static char *unprefix_name (const char *orig_name) {
+    return (orig_name[0] == '_' ? xstrdup (orig_name + 1) : xstrdup (orig_name));
+}
+
+static char *undecorate_name (const char *orig_name) {
+
+    char *at_p;
+    
+    if (orig_name[0] == '_') {
+        orig_name++;
+    }
+    
+    if ((at_p = strchr (orig_name, '@'))) {
+        return xstrndup (orig_name, at_p - orig_name);
+    }
+    
+    return xstrdup (orig_name);
+
+}
+
+static void import_generate_import (const char *import_name, short ordinal_hint, short import_type, short import_name_type, const char *filename) {
+
+    struct object_file *of;
+    struct symbol *symbol;
+    
+    struct section_part *part;
+    struct section *section;
+    
+    struct reloc_entry *relocs;
+    struct subsection *subsection;
+    
+    struct section_part *dot_idata5_part;
+    char *real_import_name;
+    
+    of = object_file_make (filename, 2 + 1 + ((import_type == IMPORT_CODE) ? 1 : 0));
+    symbol = of->symbol_arr;
+    
+    section = section_find_or_make (".idata");
+    subsection = subsection_find_or_make (section, "4");
+    
+    part = section_part_new (section, of);
+    subsection_append_section_part (subsection, part);
+    
+    part->content = xmalloc (part->content_size = 4);
+    part->reloc_cnt = 1;
+    part->reloc_arr = xmalloc (part->reloc_cnt * sizeof (*part->reloc_arr));
+    
+    relocs = part->reloc_arr;
+    
+    relocs[0].symbol = &of->symbol_arr[1];
+    relocs[0].howto = &reloc_howtos[RELOC_TYPE_32_NO_BASE];
+    relocs[0].offset = 0;
+    
+    subsection = subsection_find_or_make (section, "5");
+    
+    part = section_part_new (section, of);
+    subsection_append_section_part (subsection, part);
+    
+    part->content = xmalloc (part->content_size = 4);
+    
+    symbol->name = xstrdup (".idata$5");
+    symbol->value = 0;
+    symbol->part = part;
+    symbol->section_number = 2;
+    
+    symbol++;
+    
+    part->reloc_cnt = 1;
+    part->reloc_arr = xmalloc (part->reloc_cnt * sizeof (*part->reloc_arr));
+    
+    relocs = part->reloc_arr;
+    
+    relocs[0].symbol = &of->symbol_arr[1];
+    relocs[0].howto = &reloc_howtos[RELOC_TYPE_32_NO_BASE];
+    relocs[0].offset = 0;
+    
+    dot_idata5_part = part;
+    subsection = subsection_find_or_make (section, "6");
+    
+    part = section_part_new (section, of);
+    subsection_append_section_part (subsection, part);
+    
+    switch (import_name_type) {
+    
+        case IMPORT_ORDINAL:
+        
+            report_at (program_name, 0, REPORT_INTERNAL_ERROR, "IMPORT_ORDINAL is not yet supported");
+            exit (EXIT_FAILURE);
+        
+        case IMPORT_NAME:
+        
+            real_import_name = xstrdup (import_name);
+            break;
+        
+        case IMPORT_NAME_NOPREFIX:
+        
+            real_import_name = unprefix_name (import_name);
+            break;
+        
+        case IMPORT_NAME_UNDECORATE:
+        
+            real_import_name = undecorate_name (import_name);
+            break;
+        
+        default:
+        
+            report_at (program_name, 0, REPORT_FATAL_ERROR, "invalid or unsupported ImportNameType: %i", import_name_type);
+            exit (EXIT_FAILURE);
+    
+    }
+    
+    part->content = xmalloc (part->content_size = ALIGN (2 + strlen (real_import_name) + 1, 2));
+    
+    integer_to_array (ordinal_hint, part->content, 2);
+    strcpy ((char *) part->content + 2, real_import_name);
+    
+    free (real_import_name);
+    
+    symbol->name = xstrdup (".idata$6");
+    symbol->value = 0;
+    symbol->part = part;
+    symbol->section_number = 3;
+    
+    symbol++;
+    
+    if (import_type == IMPORT_CODE) {
+    
+        section = section_find_or_make (".text");
+        
+        part = section_part_new (section, of);
+        section_append_section_part (section, part);
+        
+        part->content = xmalloc (part->content_size = 8);
+        memcpy (part->content, "\xFF\x25\x00\x00\x00\x00\x90\x90", 8);
+        
+        symbol->name = xstrdup (import_name);
+        symbol->value = 0;
+        symbol->part = part;
+        symbol->section_number = 4;
+        symbol_record_external_symbol (symbol);
+        
+        symbol++;
+        
+        part->reloc_cnt = 1;
+        part->reloc_arr = xmalloc (part->reloc_cnt * sizeof (*part->reloc_arr));
+        
+        relocs = part->reloc_arr;
+        
+        relocs[0].symbol = &of->symbol_arr[0];
+        relocs[0].howto = &reloc_howtos[RELOC_TYPE_32];
+        relocs[0].offset = 2;
+    
+    }
+    
+    symbol->name = xmalloc (6 + strlen (import_name) + 1);
+    sprintf (symbol->name, "__imp_%s", import_name);
+    
+    symbol->value = 0;
+    symbol->part = dot_idata5_part;
+    symbol->section_number = 2;
+    symbol_record_external_symbol (symbol);
+
+}
+
+
+/**
+ * According to https://oldweb.today/?browser=ff10#19831010000000/http://learn.microsoft.com/en-us/windows/win32/debug/pe-format
+ * the short form entries have had the dll name in the entry since dll's were introduced in 1983 so it should be safe to assume
+ * that there's one present.
+ */
+char *current_import_dll_name = 0;
+
+static void import_generate_head (const char *filename, const char *dll_name) {
+
+    struct object_file *of;
+    struct subsection *subsection;
+    
+    struct section *section;
+    struct section_part *part;
+    
+    struct pe_import_directory_table *import_dt;
+    struct reloc_entry *relocs;
+    
+    unsigned long i;
+    of = object_file_make (filename, 3);
+    
+    section = section_find_or_make (".idata");
+    section->flags = translate_characteristics_to_section_flags (IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE);
+    
+    subsection = subsection_find_or_make (section, "2");
+    
+    part = section_part_new (section, of);
+    subsection_append_section_part (subsection, part);
+    
+    import_dt = (struct pe_import_directory_table *) (part->content = xmalloc (part->content_size = sizeof (*import_dt)));
+    
+    integer_to_array (0, import_dt->ImportNameTableRVA, 4);
+    integer_to_array (0, import_dt->TimeDateStamp, 4);
+    integer_to_array (0, import_dt->ForwarderChain, 4);
+    integer_to_array (0, import_dt->NameRVA, 4);
+    integer_to_array (0, import_dt->ImportAddressTableRVA, 4);
+    
+    part->reloc_cnt = 3;
+    part->reloc_arr = xmalloc (part->reloc_cnt * sizeof (*part->reloc_arr));
+    
+    relocs = part->reloc_arr;
+    
+    for (i = 0; i < 3; i++) {
+    
+        relocs[i].symbol = &of->symbol_arr[i];
+        relocs[i].howto = &reloc_howtos[RELOC_TYPE_32_NO_BASE];
+    
+    }
+    
+    relocs[0].offset = offsetof (struct pe_import_directory_table, ImportNameTableRVA);
+    relocs[1].offset = offsetof (struct pe_import_directory_table, ImportAddressTableRVA);
+    relocs[2].offset = offsetof (struct pe_import_directory_table, NameRVA);
+    
+    subsection = subsection_find_or_make (section, "4");
+    
+    part = section_part_new (section, of);
+    subsection_append_section_part (subsection, part);
+    
+    part->content_size = 0;
+    
+    of->symbol_arr[0].name = xstrdup (".idata$4");
+    of->symbol_arr[0].value = 0;
+    of->symbol_arr[0].part = part;
+    of->symbol_arr[0].section_number = 2;
+    
+    subsection = subsection_find_or_make (section, "5");
+    
+    part = section_part_new (section, of);
+    subsection_append_section_part (subsection, part);
+    
+    part->content_size = 0;
+    
+    of->symbol_arr[1].name = xstrdup (".idata$5");
+    of->symbol_arr[1].value = 0;
+    of->symbol_arr[1].part = part;
+    of->symbol_arr[1].section_number = 3;
+    
+    subsection = subsection_find_or_make (section, "7");
+    
+    part = section_part_new (section, of);
+    subsection_append_section_part (subsection, part);
+    
+    part->content = xmalloc (part->content_size = ALIGN (strlen (dll_name) + 1, 2));
+    strcpy ((char *) part->content, dll_name);
+    
+    of->symbol_arr[2].name = xstrdup (".idata$7");
+    of->symbol_arr[2].value = 0;
+    of->symbol_arr[2].part = part;
+    of->symbol_arr[2].section_number = 4;
+
+}
+
+static void import_generate_end (void) {
+
+    struct object_file *of;
+    struct subsection *subsection;
+    
+    struct section *section;
+    struct section_part *part;
+    
+    of = object_file_make (FAKE_LD_FILENAME, 3);
+    
+    section = section_find_or_make (".idata");
+    subsection = subsection_find_or_make (section, "4");
+    
+    part = section_part_new (section, of);
+    subsection_append_section_part (subsection, part);
+    
+    part->content = xmalloc (part->content_size = 4);
+    subsection = subsection_find_or_make (section, "5");
+    
+    part = section_part_new (section, of);
+    subsection_append_section_part (subsection, part);
+    
+    part->content = xmalloc (part->content_size = 4);
+
+}
+
+void pe_archive_end (void) {
+
+    if (current_import_dll_name) {
+    
+        import_generate_end ();
+        free (current_import_dll_name);
+        
+        current_import_dll_name = 0;
+    
+    }
+
+}
+
+void read_pe_import_library (const char *filename, unsigned char *data) {
+
+    struct import_library_header *import_header = (struct import_library_header *) data;
+    
+    const char *import_name;
+    const char *dll_name;
+    
+    if (state->format != LD_FORMAT_I386_PE) {
+        return;
+    }
+    
+    if ((array_to_integer (import_header->Type, 2) & 0x03) == IMPORT_CONST) {
+    
+        report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "+++ not yet supported import header import Type: 0x%x", array_to_integer (import_header->Type, 2) & 0x3);
+        return;
+    
+    }
+    
+    import_name = (const char *) data + sizeof (*import_header);
+    dll_name = import_name + strlen (import_name) + 1;
+    
+    if (current_import_dll_name && strcmp (dll_name, current_import_dll_name)) {
+    
+        import_generate_end ();
+        free (current_import_dll_name);
+        
+        current_import_dll_name = 0;
+    
+    }
+    
+    if (!current_import_dll_name) {
+    
+        current_import_dll_name = xstrdup (dll_name);
+        import_generate_head (filename, current_import_dll_name);
+    
+    }
+    
+    import_generate_import (import_name, array_to_integer (import_header->OrdinalHint, 2), array_to_integer (import_header->Type, 2) & 0x03, array_to_integer (import_header->Type, 2) >> 2, filename);
+
+}

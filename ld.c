@@ -93,6 +93,17 @@ static int read_object_file (const char *filename, unsigned char *data, unsigned
     
     }
     
+    if (data[0] == 0 && data[1] == 0) {
+    
+        if (data[2] == 0xff && data[3] == 0xff) {
+        
+            read_pe_import_library (filename, data);
+            return 0;
+        
+        }
+    
+    }
+    
     if (data[0] == RECORD_TYPE_THEADR) {
     
         read_omf_object (filename, data, data_size);
@@ -205,18 +216,24 @@ static void read_archive (const char *filename, unsigned char *data) {
     
     }
     
-    for (i = 0; i < no_symbols && (!start_header_object_offset || !end_header_object_offset); i++) {
+    if (state->format == LD_FORMAT_I386_PE) {
     
-        if (strncmp (offset_name_table[i].name, "__head_", 7) == 0) {
-            start_header_object_offset = offset_name_table[i].offset;
-        } else if (strlen (offset_name_table[i].name) > 6 && strcmp (offset_name_table[i].name + strlen (offset_name_table[i].name) - 6, "_iname") == 0) {
-            end_header_object_offset = offset_name_table[i].offset;
+        for (i = 0; i < no_symbols && (!start_header_object_offset || !end_header_object_offset); i++) {
+        
+            char *symbol_name = offset_name_table[i].name;
+            
+            if (strncmp (symbol_name, "__head_", 7) == 0) {
+                start_header_object_offset = offset_name_table[i].offset;
+            } else if (strlen (symbol_name) > 6 && strncmp (symbol_name + strlen (symbol_name) - 6, "_iname", 6) == 0) {
+                end_header_object_offset = offset_name_table[i].offset;
+            }
+        
+        }
+        
+        if (start_header_object_offset) {
+            read_archive_memeber (data + start_header_object_offset, filename);
         }
     
-    }
-    
-    if (start_header_object_offset) {
-        read_archive_memeber (data + start_header_object_offset, filename);
     }
     
     while (1) {
@@ -246,8 +263,14 @@ static void read_archive (const char *filename, unsigned char *data) {
     
     }
     
-    if (end_header_object_offset) {
-        read_archive_memeber (data + end_header_object_offset, filename);
+    if (state->format == LD_FORMAT_I386_PE) {
+    
+        if (end_header_object_offset) {
+            read_archive_memeber (data + end_header_object_offset, filename);
+        }
+        
+        pe_archive_end ();
+    
     }
     
     free (offset_name_table);
