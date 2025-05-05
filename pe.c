@@ -10,12 +10,16 @@
 #include    <string.h>
 #include    <time.h>
 
+#include    "ar.h"
 #include    "ld.h"
 #include    "lib.h"
 #include    "pe.h"
 #include    "report.h"
 #include    "section.h"
 #include    "write7x.h"
+
+static char *output_implib_filename = 0;
+static int kill_at = 0;
 
 static unsigned short subsystem = IMAGE_SUBSYSTEM_WINDOWS_CUI;
 
@@ -33,18 +37,27 @@ static struct exclude_symbol *exclude_symbols = 0;
 
 #define     LD_OPTION_IGNORED                               0
 #define     LD_OPTION_FILE_ALIGNMENT                        1
-#define     LD_OPTION_SECTION_ALIGNMENT                     2
-#define     LD_OPTION_STACK                                 3
-#define     LD_OPTION_SUBSYSTEM                             4
+#define     LD_OPTION_KILL_AT                               2
+#define     LD_OPTION_OUT_IMPLIB                            3
+#define     LD_OPTION_SECTION_ALIGNMENT                     4
+#define     LD_OPTION_SHARED                                5
+#define     LD_OPTION_STACK                                 6
+#define     LD_OPTION_SUBSYSTEM                             7
 
 static struct ld_option opts[] = {
 
-    {   "--file-alignment",         LD_OPTION_FILE_ALIGNMENT,       LD_OPTION_HAS_ARG   },
-    {   "--section-alignment",      LD_OPTION_SECTION_ALIGNMENT,    LD_OPTION_HAS_ARG   },
-    {   "--subsystem",              LD_OPTION_SUBSYSTEM,            LD_OPTION_HAS_ARG   },
+    {   "--file-alignment",         LD_OPTION_TYPE_LONG,        LD_OPTION_FILE_ALIGNMENT,       LD_OPTION_HAS_ARG   },
+    {   "--section-alignment",      LD_OPTION_TYPE_LONG,        LD_OPTION_SECTION_ALIGNMENT,    LD_OPTION_HAS_ARG   },
     
+    {   "--subsystem",              LD_OPTION_TYPE_LONG,        LD_OPTION_SUBSYSTEM,            LD_OPTION_HAS_ARG   },
     
-    {   0,                          0,                              0                   }
+    {   "--shared",                 LD_OPTION_TYPE_LONG,        LD_OPTION_SHARED,               LD_OPTION_NO_ARG    },
+    {   "-Bshareable",              LD_OPTION_TYPE_LONG,        LD_OPTION_SHARED,               LD_OPTION_NO_ARG    },
+    
+    {   "--kill-at",                LD_OPTION_TYPE_LONG,        LD_OPTION_KILL_AT,              LD_OPTION_NO_ARG    },
+    {   "--out-implib",             LD_OPTION_TYPE_LONG,        LD_OPTION_OUT_IMPLIB,           LD_OPTION_HAS_ARG   },
+    
+    {   0,                          0,                          0,                              0                   }
 
 };
 
@@ -62,7 +75,24 @@ int pe_check_option (const char *cmd_arg, int argc, char **argv, int *optind, co
         }
         
         if (!strstart (p1, &r1)) {
-            continue;
+        
+            if (popt->type == LD_OPTION_TYPE_LONG) {
+            
+                if (*r1 != '-') {
+                    continue;
+                }
+                
+                p1 = popt->name + 1;
+                r1 = cmd_arg;
+                
+                if (!strstart (p1, &r1)) {
+                    continue;
+                }
+            
+            } else {
+                continue;
+            }
+        
         }
         
         (*optarg) = r1;
@@ -129,6 +159,24 @@ void pe_use_option (const char *cmd_arg, int idx, const char *optarg) {
         
         }
         
+        case LD_OPTION_KILL_AT: {
+        
+            kill_at = 1;
+            break;
+        
+        }
+        
+        case LD_OPTION_OUT_IMPLIB: {
+        
+            if (output_implib_filename) {
+                free (output_implib_filename);
+            }
+            
+            output_implib_filename = xstrdup (optarg);
+            break;
+        
+        }
+        
         case LD_OPTION_SECTION_ALIGNMENT: {
         
             long conversion;
@@ -150,6 +198,13 @@ void pe_use_option (const char *cmd_arg, int idx, const char *optarg) {
                 report_at (program_name, 0, REPORT_WARNING, "section alignment must be greater than or equal to file alignment according to the specification");
             }
             
+            break;
+        
+        }
+        
+        case LD_OPTION_SHARED: {
+        
+            state->create_shared_library = 1;
             break;
         
         }
@@ -203,6 +258,104 @@ unsigned char dos_stub[] = {
     0x24,   0x00,   0x00,   0x00,   0x00,   0x00,   0x00,   0x00
 
 };
+
+struct name_list {
+
+    char *name;
+    int info;
+    
+    struct name_list *next;
+
+};
+
+static struct name_list *export_name_list = 0;
+static struct name_list **last_export_name_list_p = &export_name_list;
+
+void pe_interpret_dot_drectve_section (/*const char *filename, unsigned char *data, unsigned long data_size, */unsigned char *pos, unsigned long size) {
+
+    char *temp_buf = xmalloc (size + 1), *p;
+    
+    memcpy (temp_buf, pos, size);
+    temp_buf[size] = '\0';
+    
+    if (pos[0] == 0xEF && pos[1] == 0xBB && pos[2] == 0xBF) {
+    
+        report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "UTF-8 byte order marker not yet supported at the start of .drectve section");
+        exit (EXIT_FAILURE);
+    
+    }
+    
+    p = temp_buf;
+    
+    while (*p) {
+    
+        while (*p == ' ') {
+            p++;
+        }
+        
+        if (strncmp (p, "-export:", 8) == 0 || strncmp (p, "/EXPORT:", 8) == 0) {
+        
+            char *q, saved_ch;
+            int data;
+            
+            struct name_list *name_list;
+            char *comma;
+            
+            p += 8;
+            
+            if (!(q = strchr (p, ' '))) {
+                q = p + strlen (p);
+            }
+            
+            saved_ch = *q;
+            *q = '\0';
+            
+            if ((comma = strchr (p, ','))) {
+            
+                if (strcmp (comma, ",data") == 0 || strcmp (comma, ",DATA") == 0) {
+                    data = 1;
+                } else {
+                
+                    report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "unsupported comma argument to option -export: '%s'", comma);
+                    exit (EXIT_FAILURE);
+                
+                }
+                
+                *comma = '\0';
+            
+            }
+            
+            if (*p == '"') {
+                p++;
+            }
+            
+            if (p[strlen (p) - 1] == '"') {
+                p[strlen (p) - 1] = '\0';
+            }
+            
+            name_list = xmalloc (sizeof (*name_list));
+            
+            name_list->name = xstrdup (p);
+            name_list->info = data;
+            
+            *last_export_name_list_p = name_list;
+            last_export_name_list_p = &name_list->next;
+            
+            *q = saved_ch;
+            p = q;
+        
+        } else {
+        
+            report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "unsupported .drectve option: %s", p);
+            exit (EXIT_FAILURE);
+        
+        }
+    
+    }
+    
+    free (temp_buf);
+
+}
 
 static int generate_reloc_section = 1;
 static int can_be_relocated = 0;
@@ -547,6 +700,345 @@ static unsigned long calculate_checksum (unsigned char *base, unsigned long chks
 
 }
 
+static unsigned long write_archive_member (unsigned char *pos, const char *name, unsigned long size, unsigned long lu_timestamp) {
+
+    struct ar_header *member_hdr = (struct ar_header *) pos;
+    memset (member_hdr, ' ', sizeof (*member_hdr));
+    
+    memcpy (member_hdr->name, name, strlen (name));
+    member_hdr->mtime[sprintf (member_hdr->mtime, "%lu", lu_timestamp)] = ' ';
+    
+    member_hdr->owner[0] = '0';
+    member_hdr->group[0] = '0';
+    member_hdr->mode[0] = '0';
+    
+    member_hdr->size[sprintf (member_hdr->size, "%lu", size)] = ' ';
+    memcpy (member_hdr->endsig, "`\n", 2);
+    
+    return sizeof (*member_hdr);
+
+}
+
+enum export_type {
+
+    EXPORT_TYPE_CODE,
+    EXPORT_TYPE_DATA,
+    EXPORT_TYPE_CONST
+
+};
+
+struct export_name {
+
+    char *name, *name_no_at;
+    enum export_type export_type;
+
+};
+
+static void write_implib (struct export_name *export_names, unsigned long num_names, unsigned long ordinal_base) {
+
+    unsigned long lu_timestamp = 0, i;
+    unsigned long data_size = 8;
+    
+    unsigned char *data, *pos;
+    FILE *outfile;
+    
+    struct pe_import_library_header *import_hdr;
+    unsigned long linker_member_size, num_linker_member_offsets;
+    
+    unsigned char *offset_pos, *string_table_pos;
+    unsigned short type = 0;
+    
+    linker_member_size = 1 * 4;
+    num_linker_member_offsets = 0;
+    
+    for (i = 0; i < num_names; i++) {
+    
+        data_size += sizeof (struct ar_header);
+        data_size += 20;
+        data_size++;
+        data_size += strlen (export_names[i].name) + 1;
+        data_size += strlen (state->output_filename) + 1;
+        
+        if (export_names[i].export_type == EXPORT_TYPE_CODE) {
+        
+            linker_member_size += 1 + 4 + strlen (export_names[i].name) + 1;
+            num_linker_member_offsets++;
+        
+        }
+        
+        linker_member_size += 1 + 4 + 6 + strlen (export_names[i].name) + 1;
+        num_linker_member_offsets++;
+        
+        data_size = ALIGN (data_size, 2);
+    
+    }
+    
+    linker_member_size = ALIGN (linker_member_size, 2);
+    data_size += sizeof (struct ar_header) + linker_member_size;
+    
+    pos = (data = xmalloc (data_size));
+    memcpy (pos, "!<arch>\n", 8);
+    
+    pos += 8 + write_archive_member (pos + 8, "/", linker_member_size, 0);
+    
+    integer_to_byte_array (num_linker_member_offsets, pos, 4, 1);
+    pos += 4;
+    
+    string_table_pos = pos + num_linker_member_offsets * 4;
+    offset_pos = pos;
+    
+    pos = data + 8 + sizeof (struct ar_header) + linker_member_size;
+    
+    for (i = 0; i < num_names; i++) {
+    
+        if (export_names[i].export_type == EXPORT_TYPE_CODE) {
+        
+            integer_to_byte_array (pos - data, offset_pos, 4, 1);
+            offset_pos += 4;
+            
+            string_table_pos += sprintf ((char *) string_table_pos, "_%s", export_names[i].name) + 1;
+        
+        }
+        
+        integer_to_byte_array (pos - data, offset_pos, 4, 1);
+        offset_pos += 4;
+        
+        memcpy (string_table_pos, "__imp_", 6);
+        string_table_pos += 6;
+        
+        string_table_pos += sprintf ((char *) string_table_pos, "_%s", export_names[i].name) + 1;
+        pos += write_archive_member (pos, state->output_filename, 20 + 1 + strlen (export_names[i].name) + 1 + strlen (state->output_filename) + 1, lu_timestamp);
+        
+        import_hdr = (struct pe_import_library_header *) pos;
+        
+        integer_to_array (0x0000, import_hdr->Magic1, 2);
+        integer_to_array (0xFFFF, import_hdr->Magic2, 2);
+        
+        integer_to_array (0, import_hdr->Version, 2);
+        integer_to_array (IMAGE_FILE_MACHINE_I386, import_hdr->Machine, 2);
+        
+        integer_to_array (lu_timestamp, import_hdr->TimeDateStamp, 4);
+        integer_to_array (strlen (export_names[i].name) + 1 + strlen (state->output_filename) + 1, import_hdr->SizeOfData, 4);
+        
+        integer_to_array (ordinal_base + i, import_hdr->OrdinalHint, 2);
+        
+        switch (export_names[i].export_type) {
+        
+            case EXPORT_TYPE_CODE:
+            
+                type = IMPORT_CODE;
+                break;
+            
+            case EXPORT_TYPE_DATA:
+            
+                type = IMPORT_DATA;
+                break;
+            
+            case EXPORT_TYPE_CONST:
+            
+                type = IMPORT_CONST;
+                break;
+        
+        }
+        
+        if (kill_at) {
+            type |= IMPORT_NAME_UNDECORATE << 2;
+        }
+        
+        integer_to_array (type | (IMPORT_NAME_NOPREFIX << 2), import_hdr->Type, 2);
+        pos += sizeof (*import_hdr);
+        
+        pos += sprintf ((char *) pos, "_%s", export_names[i].name) + 1;
+        pos += sprintf ((char *) pos, "%s", state->output_filename) + 1;
+        
+        pos = data + ALIGN (pos - data, 2);
+    
+    }
+    
+    if (!(outfile = fopen (output_implib_filename, "wb"))) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "failed to open '%s' for writing", output_implib_filename);
+        return;
+    
+    }
+    
+    if (fwrite (data, data_size, 1, outfile) != 1) {
+        report_at (program_name, 0, REPORT_ERROR, "failed whist writing data to '%s'", output_implib_filename);
+    }
+    
+    fclose (outfile);
+    free (data);
+
+}
+
+static int export_name_compar (const void *a, const void *b) {
+    return strcmp (((struct export_name *) a)->name, ((struct export_name *) b)->name);
+}
+
+static char *unat_name (const char *orig_name) {
+
+    char *at_p;
+    return ((at_p = strchr (orig_name, '@')) ? xstrndup (orig_name, at_p - orig_name) : xstrdup (orig_name));
+
+}
+
+static void generate_edata (void) {
+
+    struct object_file *of;
+    struct symbol *symbol;
+    
+    struct section *section;
+    struct section_part *part;
+    
+    struct name_list *name_list, *next_name_list;
+    struct export_name *export_names;
+    
+    struct pe_export_directory *ied;
+    struct reloc_entry *relocs;
+    
+    unsigned long ordinal_base = 1, i, num_names, name_table_size, name_table_offset;
+    char *name;
+    
+    for (name_list = export_name_list, num_names = 0, name_table_size = 0; name_list; name_list = name_list->next) {
+        num_names++;
+    }
+    
+    export_names = xmalloc (sizeof (*export_names) * num_names);
+    
+    for (name_list = export_name_list, i = 0; name_list; name_list = next_name_list, i++) {
+    
+        next_name_list = name_list->next;
+        export_names[i].name = name_list->name;
+        
+        if (kill_at) {
+        
+            export_names[i].name_no_at = unat_name (export_names[i].name);
+            name_table_size += strlen (export_names[i].name_no_at) + 1;
+        
+        } else {
+        
+            export_names[i].name_no_at = 0;
+            name_table_size += strlen (export_names[i].name) + 1;
+        
+        }
+        
+        export_names[i].export_type = name_list->info ? EXPORT_TYPE_DATA : EXPORT_TYPE_CODE;
+        free (name_list);
+    
+    }
+    
+    qsort (export_names, num_names, sizeof (*export_names), &export_name_compar);
+    
+    if (output_implib_filename) {
+        write_implib (export_names, num_names, ordinal_base);
+    }
+    
+    name_table_size += strlen (state->output_filename) + 1;
+    
+    section = section_find_or_make (".edata");
+    section->flags = translate_characteristics_to_section_flags (IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ);
+    
+    of = object_file_make (FAKE_LD_FILENAME, num_names + 1);
+    
+    part = section_part_new (section, of);
+    section_append_section_part (section, part);
+    
+    part->content_size = (sizeof (*ied) + (num_names * (4 + 4 + 2)) + name_table_size);
+    part->content = xmalloc (part->content_size);
+    
+    part->reloc_cnt = 4 + num_names * 2;
+    part->reloc_arr = xmalloc (part->reloc_cnt * sizeof (*part->reloc_arr));
+    
+    relocs = part->reloc_arr;
+    
+    of->symbol_arr[0].name = xstrdup (section->name);
+    of->symbol_arr[0].value = 0;
+    of->symbol_arr[0].part = part;
+    of->symbol_arr[0].section_number = 1;
+    
+    name_table_offset = sizeof (*ied) + (num_names * (4 + 4 + 2));
+    
+    ied = (struct pe_export_directory *) part->content;
+    memset (ied, 0, sizeof (*ied));
+    
+    integer_to_array (name_table_offset, ied->NameRVA, 4);
+    integer_to_array (ordinal_base, ied->OrdinalBase, 4);
+    integer_to_array (num_names, ied->AddressTableEntries, 4);
+    integer_to_array (num_names, ied->NumberOfNamePointers, 4);
+    integer_to_array (sizeof (*ied), ied->ExportAddressTableRVA, 4);
+    
+    integer_to_array (array_to_integer (ied->ExportAddressTableRVA, 4) + num_names * 4, ied->NamePointerRVA, 4);
+    integer_to_array (array_to_integer (ied->NamePointerRVA, 4) + num_names * 4, ied->OrdinalTableRVA, 4);
+    
+    for (i = 0; i < 4; i++) {
+    
+        relocs[i].symbol = &of->symbol_arr[0];
+        relocs[i].howto = &reloc_howtos[RELOC_TYPE_32_NO_BASE];
+    
+    }
+    
+    relocs[0].offset = offsetof (struct pe_export_directory, NameRVA);
+    relocs[1].offset = offsetof (struct pe_export_directory, ExportAddressTableRVA);
+    relocs[2].offset = offsetof (struct pe_export_directory, NamePointerRVA);
+    relocs[3].offset = offsetof (struct pe_export_directory, OrdinalTableRVA);
+    
+    relocs += 4;
+    
+    strcpy ((char *) part->content + name_table_offset, state->output_filename);
+    name_table_offset += strlen (state->output_filename) + 1;
+    
+    symbol = of->symbol_arr + 1;
+    
+    for (i = 0; i < num_names; i++) {
+    
+        symbol->name = xmalloc (1 + strlen (export_names[i].name) + 1);
+        sprintf (symbol->name, "_%s", export_names[i].name);
+        
+        symbol->value = 0;
+        symbol->part = 0;
+        symbol->section_number = 0;
+        
+        symbol_record_external_symbol (symbol);
+        
+        relocs[0].offset = array_to_integer (ied->ExportAddressTableRVA, 4) + 4 * i;
+        relocs[0].symbol = symbol;
+        relocs[0].howto = &reloc_howtos[RELOC_TYPE_32_NO_BASE];
+        
+        symbol++;
+        relocs++;
+        
+        relocs[0].offset = array_to_integer (ied->NamePointerRVA, 4) + 4 * i;
+        relocs[0].symbol = &of->symbol_arr[0];
+        relocs[0].howto = &reloc_howtos[RELOC_TYPE_32_NO_BASE];
+        
+        integer_to_array (name_table_offset, part->content + relocs[0].offset, 4);
+        relocs++;
+        
+        integer_to_array (i, part->content + array_to_integer (ied->OrdinalTableRVA, 4) + 2 * i, 4);
+        
+        name = kill_at ? export_names[i].name_no_at : export_names[i].name;
+        strcpy ((char *) part->content + name_table_offset, name);
+        
+        name_table_offset += strlen (name) + 1;
+    
+    }
+    
+    for (i = 0; i < num_names; i++) {
+    
+        if (export_names[i].name) {
+            free (export_names[i].name);
+        }
+        
+        if (export_names[i].name_no_at) {
+            free (export_names[i].name_no_at);
+        }
+    
+    }
+    
+    free (export_names);
+
+}
+
 void pe_after_link (void) {
 
     unsigned long num_relocs = 0, saved_i = 0, i;
@@ -622,6 +1114,12 @@ void pe_before_link (void) {
     }
     
     exclude_symbols_free ();
+    
+    if (export_name_list) {
+        generate_edata ();
+    } else if (output_implib_filename) {
+        write_implib (0, 0, 0);
+    }
     
     if (!check_reloc_section_needed ()) {
     
@@ -943,8 +1441,12 @@ void pe_print_help (void) {
     fprintf (stderr, "i386pe:\n\n");
     
     fprintf (stderr, "    --file-alignment <size>           Set file alignment.\n");
+    fprintf (stderr, "    --out-implib FILE                 Generate import library\n");
     fprintf (stderr, "    --section-alignment <size>        Set section alignment.\n");
     fprintf (stderr, "    --subsystem <name>                Set required OS subsystem.\n");
+    
+    fprintf (stderr, "\n");
+    fprintf (stderr, "    -shared, -Bshareable              Create a shared library\n");
 
 }
 
@@ -955,28 +1457,6 @@ unsigned long pe_get_first_section_rva (void) {
 unsigned long pe_align_to_file_alignment (unsigned long value) {
     return ALIGN (value, file_alignment);
 }
-
-struct import_library_header {
-
-    unsigned char Magic1[2];
-    unsigned char Magic2[2];
-    unsigned char Version[2];
-    unsigned char Machine[2];
-    unsigned char TimeDateStamp[4];
-    unsigned char SizeOfData[4];
-    unsigned char OrdinalHint[2];
-    unsigned char Type[2];
-
-};
-
-#define     IMPORT_CODE                 0
-#define     IMPORT_DATA                 1
-#define     IMPORT_CONST                2
-
-#define     IMPORT_ORDINAL              0
-#define     IMPORT_NAME                 1
-#define     IMPORT_NAME_NOPREFIX        2
-#define     IMPORT_NAME_UNDECORATE      3
 
 static char *unprefix_name (const char *orig_name) {
     return (orig_name[0] == '_' ? xstrdup (orig_name + 1) : xstrdup (orig_name));
@@ -1278,7 +1758,7 @@ void pe_archive_end (void) {
 
 void read_pe_import_library (const char *filename, unsigned char *data) {
 
-    struct import_library_header *import_header = (struct import_library_header *) data;
+    struct pe_import_library_header *import_header = (struct pe_import_library_header *) data;
     
     const char *import_name;
     const char *dll_name;

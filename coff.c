@@ -13,6 +13,7 @@
 #include    "coff.h"
 #include    "ld.h"
 #include    "lib.h"
+#include    "pe.h"
 #include    "report.h"
 #include    "section.h"
 #include    "write7x.h"
@@ -269,6 +270,17 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         
         if ((p = strchr (section_name, '$'))) {
             *p++ = '\0';
+        }
+        
+        if (state->format == LD_FORMAT_I386_PE && strcmp (section_name, ".drectve") == 0) {
+        
+            pe_interpret_dot_drectve_section (/*filename, data, data_size, */data + array_to_integer (section_hdr->PointerToRawData, 4), array_to_integer (section_hdr->SizeOfRawData, 4));
+            
+            part_p_array[i + 1] = 0;
+            free (section_name);
+            
+            continue;
+        
         }
         
         if (array_to_integer (section_hdr->Characteristics, 4) & IMAGE_SCN_LNK_REMOVE) {

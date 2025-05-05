@@ -698,7 +698,7 @@ static void calculate_entry_point (void) {
         state->entry_point = section->rva;
     }
     
-    if (state->entry_symbol_name) {
+    if (!state->create_shared_library && state->entry_symbol_name) {
         report_at (program_name, 0, REPORT_WARNING, "cannot find entry symbol '%s'; defaulting to 0x%08lx", state->entry_symbol_name, state->base_address + state->entry_point);
     }
 

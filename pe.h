@@ -191,7 +191,46 @@ struct pe_import_directory_table {
 
 };
 
+struct pe_export_directory {
+
+    unsigned char ExportFlags[4];
+    unsigned char TimeDatStamp[4];
+    unsigned char MajorVersion[2];
+    unsigned char MinorVersion[2];
+    unsigned char NameRVA[4];
+    unsigned char OrdinalBase[4];
+    unsigned char AddressTableEntries[4];
+    unsigned char NumberOfNamePointers[4];
+    unsigned char ExportAddressTableRVA[4];
+    unsigned char NamePointerRVA[4];
+    unsigned char OrdinalTableRVA[4];
+
+};
+
+struct pe_import_library_header {
+
+    unsigned char Magic1[2];
+    unsigned char Magic2[2];
+    unsigned char Version[2];
+    unsigned char Machine[2];
+    unsigned char TimeDateStamp[4];
+    unsigned char SizeOfData[4];
+    unsigned char OrdinalHint[2];
+    unsigned char Type[2];
+
+};
+
+#define     IMPORT_CODE                 0
+#define     IMPORT_DATA                 1
+#define     IMPORT_CONST                2
+
+#define     IMPORT_ORDINAL              0
+#define     IMPORT_NAME                 1
+#define     IMPORT_NAME_NOPREFIX        2
+#define     IMPORT_NAME_UNDECORATE      3
+
 int pe_check_option (const char *cmd_arg, int argc, char **argv, int *optind, const char **optarg);
+void pe_interpret_dot_drectve_section (/*const char *filename, unsigned char *data, unsigned long data_size, */unsigned char *pos, unsigned long size);
 
 unsigned long pe_align_to_file_alignment (unsigned long value);
 unsigned long pe_get_first_section_rva (void);

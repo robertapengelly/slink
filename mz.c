@@ -20,8 +20,8 @@ unsigned long stack_size = 0x1000;
 
 static struct ld_option opts[] = {
 
-    {   "--stack",          LD_OPTION_STACK,        LD_OPTION_HAS_ARG   },
-    {   0,                  0,                      0                   }
+    {   "--stack",          LD_OPTION_TYPE_LONG,        LD_OPTION_STACK,        LD_OPTION_HAS_ARG   },
+    {   0,                  0,                          0,                      0                   }
 
 };
 
@@ -39,7 +39,24 @@ int mz_check_option (const char *cmd_arg, int argc, char **argv, int *optind, co
         }
         
         if (!strstart (p1, &r1)) {
-            continue;
+        
+            if (popt->type == LD_OPTION_TYPE_LONG) {
+            
+                if (*r1 != '-') {
+                    continue;
+                }
+                
+                p1 = popt->name + 1;
+                r1 = cmd_arg;
+                
+                if (!strstart (p1, &r1)) {
+                    continue;
+                }
+            
+            } else {
+                continue;
+            }
+        
         }
         
         (*optarg) = r1;

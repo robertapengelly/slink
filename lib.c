@@ -48,30 +48,30 @@ static struct options_with_use emulation_table[] = {
 
 static struct ld_option opts[] = {
 
-    {   "-M",                           LD_OPTION_MAP,                          LD_OPTION_NO_ARG    },
-    {   "-Map",                         LD_OPTION_MAP_FILE,                     LD_OPTION_HAS_ARG   },
-    {   "-N",                           LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
+    {   "-M",                           LD_OPTION_TYPE_SHORT,       LD_OPTION_MAP,                          LD_OPTION_NO_ARG    },
+    {   "-Map",                         LD_OPTION_TYPE_SHORT,       LD_OPTION_MAP_FILE,                     LD_OPTION_HAS_ARG   },
+    {   "-N",                           LD_OPTION_TYPE_SHORT,       LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
     
-    {   "-e",                           LD_OPTION_ENTRY,                        LD_OPTION_HAS_ARG   },
-    {   "-m",                           LD_OPTION_EMULATION,                    LD_OPTION_HAS_ARG   },
-    {   "-o",                           LD_OPTION_OUTFILE,                      LD_OPTION_HAS_ARG   },
-    {   "-s",                           LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
-    {   "-q",                           LD_OPTION_EMIT_RELOCS,                  LD_OPTION_NO_ARG    },
-    
-    
-    {   "--emit-relocs",                LD_OPTION_EMIT_RELOCS,                  LD_OPTION_NO_ARG    },
-    {   "--entry",                      LD_OPTION_ENTRY,                        LD_OPTION_HAS_ARG   },
-    {   "--help",                       LD_OPTION_HELP,                         LD_OPTION_NO_ARG    },
-    {   "--image-base",                 LD_OPTION_IMAGE_BASE,                   LD_OPTION_HAS_ARG   },
-    {   "--oformat",                    LD_OPTION_FORMAT,                       LD_OPTION_HAS_ARG   },
-    {   "--omagic",                     LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
-    {   "--output",                     LD_OPTION_OUTFILE,                      LD_OPTION_HAS_ARG   },
-    {   "--print-map",                  LD_OPTION_MAP,                          LD_OPTION_NO_ARG    },
-    {   "--strip-all",                  LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
+    {   "-e",                           LD_OPTION_TYPE_SHORT,       LD_OPTION_ENTRY,                        LD_OPTION_HAS_ARG   },
+    {   "-m",                           LD_OPTION_TYPE_SHORT,       LD_OPTION_EMULATION,                    LD_OPTION_HAS_ARG   },
+    {   "-o",                           LD_OPTION_TYPE_SHORT,       LD_OPTION_OUTFILE,                      LD_OPTION_HAS_ARG   },
+    {   "-s",                           LD_OPTION_TYPE_SHORT,       LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
+    {   "-q",                           LD_OPTION_TYPE_SHORT,       LD_OPTION_EMIT_RELOCS,                  LD_OPTION_NO_ARG    },
     
     
-    {   "--generate-symbols-table",     LD_OPTION_GENERATE_SYMBOLS_TABLE,       LD_OPTION_NO_ARG    },
-    {   0,                              0,                                      0                   }
+    {   "--emit-relocs",                LD_OPTION_TYPE_LONG,        LD_OPTION_EMIT_RELOCS,                  LD_OPTION_NO_ARG    },
+    {   "--entry",                      LD_OPTION_TYPE_LONG,        LD_OPTION_ENTRY,                        LD_OPTION_HAS_ARG   },
+    {   "--help",                       LD_OPTION_TYPE_LONG,        LD_OPTION_HELP,                         LD_OPTION_NO_ARG    },
+    {   "--image-base",                 LD_OPTION_TYPE_LONG,        LD_OPTION_IMAGE_BASE,                   LD_OPTION_HAS_ARG   },
+    {   "--oformat",                    LD_OPTION_TYPE_LONG,        LD_OPTION_FORMAT,                       LD_OPTION_HAS_ARG   },
+    {   "--omagic",                     LD_OPTION_TYPE_LONG,        LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
+    {   "--output",                     LD_OPTION_TYPE_LONG,        LD_OPTION_OUTFILE,                      LD_OPTION_HAS_ARG   },
+    {   "--print-map",                  LD_OPTION_TYPE_LONG,        LD_OPTION_MAP,                          LD_OPTION_NO_ARG    },
+    {   "--strip-all",                  LD_OPTION_TYPE_LONG,        LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
+    
+    
+    {   "--generate-symbols-table",     LD_OPTION_TYPE_LONG,        LD_OPTION_GENERATE_SYMBOLS_TABLE,       LD_OPTION_NO_ARG    },
+    {   0,                              0,                          0,                                      0                   }
 
 };
 
@@ -422,6 +422,28 @@ void integer_to_array (unsigned long value, unsigned char *dest, int size) {
 
 }
 
+void integer_to_byte_array (unsigned long value, unsigned char *dest, int size, int big_endian) {
+
+    if (big_endian) {
+    
+        int i, j;
+        
+        for (i = size, j = 0; i > 0; i--, j++) {
+            dest[j] = (value >> (CHAR_BIT * (i - 1))) & UCHAR_MAX;
+        }
+    
+    } else {
+    
+        int i;
+        
+        for (i = 0; i < size; i++) {
+            dest[i] = (value >> (CHAR_BIT * i)) & UCHAR_MAX;
+        }
+    
+    }
+
+}
+
 char *xstrdup (const char *__p) {
 
     char *p = xmalloc (strlen (__p) + 1);
@@ -548,7 +570,24 @@ void parse_args (int argc, char **argv, int optind) {
             }
             
             if (!strstart (p1, &r1)) {
-                continue;
+            
+                if (popt->type == LD_OPTION_TYPE_LONG) {
+                
+                    if (*r1 != '-') {
+                        continue;
+                    }
+                    
+                    p1 = popt->name + 1;
+                    r1 = r;
+                    
+                    if (!strstart (p1, &r1)) {
+                        continue;
+                    }
+                
+                } else {
+                    continue;
+                }
+            
             }
             
             optarg = r1;

@@ -350,7 +350,13 @@ int main (int argc, char **argv) {
         if (state->format == LD_FORMAT_COM) {
             state->base_address = 0x00000100;
         } else if (state->format == LD_FORMAT_I386_PE) {
-            state->base_address = 0x00400000;
+        
+            if (state->create_shared_library) {
+                state->base_address = 0x10000000;
+            } else {
+                state->base_address = 0x00400000;
+            }
+        
         }
     
     }
