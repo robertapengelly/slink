@@ -700,7 +700,7 @@ static unsigned long calculate_checksum (unsigned char *base, unsigned long chks
 
 }
 
-static unsigned long write_archive_member (unsigned char *pos, const char *name, unsigned long size, unsigned long lu_timestamp) {
+/*static unsigned long write_archive_member (unsigned char *pos, const char *name, unsigned long size, unsigned long lu_timestamp) {
 
     struct ar_header *member_hdr = (struct ar_header *) pos;
     memset (member_hdr, ' ', sizeof (*member_hdr));
@@ -717,7 +717,7 @@ static unsigned long write_archive_member (unsigned char *pos, const char *name,
     
     return sizeof (*member_hdr);
 
-}
+}*/
 
 enum export_type {
 
@@ -734,93 +734,647 @@ struct export_name {
 
 };
 
-static void write_implib (struct export_name *export_names, unsigned long num_names, unsigned long ordinal_base) {
+struct symbol_info {
 
-    unsigned long lu_timestamp = 0, i;
-    unsigned long data_size = 8;
+    char *name;
     
-    unsigned char *data, *pos;
-    FILE *outfile;
+    unsigned long name_length;
+    unsigned long offset_index;
     
-    struct pe_import_library_header *import_hdr;
-    unsigned long linker_member_size, num_linker_member_offsets;
+    struct symbol_info *next;
+
+};
+
+struct symbol_info *create_symbol_list (struct export_name *export_name, unsigned long num_names) {
+
+    char *predefined[3] = { "__IMPORT_DESCRIPTOR_", "__NULL_IMPORT_DESCRIPTOR", "_NULL_THUNK_DATA" };
     
-    unsigned char *offset_pos, *string_table_pos;
-    unsigned short type = 0;
+    struct symbol_info *info_list = 0;
+    struct symbol_info **last_info_list_p = &info_list;
     
-    linker_member_size = 1 * 4;
-    num_linker_member_offsets = 0;
+    struct symbol_info *symbol_info;
+    unsigned long i, j;
     
-    for (i = 0; i < num_names; i++) {
+    char *name = xstrdup (output_implib_filename), *p;
     
-        data_size += sizeof (struct ar_header);
-        data_size += 20;
-        data_size++;
-        data_size += strlen (export_names[i].name) + 1;
-        data_size += strlen (state->output_filename) + 1;
-        
-        if (export_names[i].export_type == EXPORT_TYPE_CODE) {
-        
-            linker_member_size += 1 + 4 + strlen (export_names[i].name) + 1;
-            num_linker_member_offsets++;
-        
-        }
-        
-        linker_member_size += 1 + 4 + 6 + strlen (export_names[i].name) + 1;
-        num_linker_member_offsets++;
-        
-        data_size = ALIGN (data_size, 2);
+    if ((p = strrchr (output_implib_filename, '.'))) {
+    
+        free (name);
+        name = xstrndup (output_implib_filename, p - output_implib_filename);
     
     }
     
-    linker_member_size = ALIGN (linker_member_size, 2);
-    data_size += sizeof (struct ar_header) + linker_member_size;
+    for (i = 0, j = 0; i < 3; i++, j++) {
     
-    pos = (data = xmalloc (data_size));
-    memcpy (pos, "!<arch>\n", 8);
-    
-    pos += 8 + write_archive_member (pos + 8, "/", linker_member_size, 0);
-    
-    integer_to_byte_array (num_linker_member_offsets, pos, 4, 1);
-    pos += 4;
-    
-    string_table_pos = pos + num_linker_member_offsets * 4;
-    offset_pos = pos;
-    
-    pos = data + 8 + sizeof (struct ar_header) + linker_member_size;
-    
-    for (i = 0; i < num_names; i++) {
-    
-        if (export_names[i].export_type == EXPORT_TYPE_CODE) {
+        symbol_info = xmalloc (sizeof (*symbol_info));
         
-            integer_to_byte_array (pos - data, offset_pos, 4, 1);
-            offset_pos += 4;
-            
-            string_table_pos += sprintf ((char *) string_table_pos, "_%s", export_names[i].name) + 1;
+        if (i == 0) {
+        
+            symbol_info->name = xmalloc (strlen (predefined[i]) + strlen (name) + 1);
+            symbol_info->name_length = sprintf (symbol_info->name, "%s%s", predefined[i], name);
         
         }
         
-        integer_to_byte_array (pos - data, offset_pos, 4, 1);
-        offset_pos += 4;
+        if (i == 1) {
         
-        memcpy (string_table_pos, "__imp_", 6);
-        string_table_pos += 6;
+            symbol_info->name = xmalloc (strlen (predefined[i]) + 1);
+            symbol_info->name_length = sprintf (symbol_info->name, "%s", predefined[i]);
         
-        string_table_pos += sprintf ((char *) string_table_pos, "_%s", export_names[i].name) + 1;
-        pos += write_archive_member (pos, state->output_filename, 20 + 1 + strlen (export_names[i].name) + 1 + strlen (state->output_filename) + 1, lu_timestamp);
+        }
         
-        import_hdr = (struct pe_import_library_header *) pos;
+        if (i == 2) {
         
-        integer_to_array (0x0000, import_hdr->Magic1, 2);
-        integer_to_array (0xFFFF, import_hdr->Magic2, 2);
+            symbol_info->name = xmalloc (1 + strlen (predefined[i]) + strlen (name) + 1);
+            symbol_info->name_length = sprintf (symbol_info->name, "\x7F%s%s", name, predefined[i]);
         
-        integer_to_array (0, import_hdr->Version, 2);
-        integer_to_array (IMAGE_FILE_MACHINE_I386, import_hdr->Machine, 2);
+        }
         
-        integer_to_array (lu_timestamp, import_hdr->TimeDateStamp, 4);
-        integer_to_array (strlen (export_names[i].name) + 1 + strlen (state->output_filename) + 1, import_hdr->SizeOfData, 4);
+        symbol_info->offset_index = j;
         
-        integer_to_array (ordinal_base + i, import_hdr->OrdinalHint, 2);
+        *last_info_list_p = symbol_info;
+        last_info_list_p = &symbol_info->next;
+    
+    }
+    
+    free (name);
+    
+    for (i = 0; i < num_names; i++, j++) {
+    
+        symbol_info = xmalloc (sizeof (*symbol_info));
+        
+        symbol_info->name = xmalloc (7 + strlen (export_name[i].name) + 1);
+        sprintf (symbol_info->name, "__imp__%s", export_name[i].name);
+        
+        symbol_info->name_length = strlen (symbol_info->name);
+        symbol_info->offset_index = j;
+        
+        *last_info_list_p = symbol_info;
+        last_info_list_p = &symbol_info->next;
+    
+    }
+    
+    return info_list;
+
+}
+
+static unsigned long swap_bytes (unsigned long value, int size) {
+
+    unsigned long new_value = 0;
+    int i;
+    
+    for (i = 0; i < size; i++) {
+        new_value = (new_value << CHAR_BIT) | ((value >> (i * CHAR_BIT)));
+    }
+    
+    return new_value;
+
+}
+
+static unsigned long write_data (FILE *outfile, void *data, unsigned long data_size) {
+
+    if (fwrite (data, data_size, 1, outfile) != 1) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "failed whist writing data to '%s'", output_implib_filename);
+        return 0;
+    
+    }
+    
+    return data_size;
+
+}
+
+static unsigned long write_file_header (FILE *outfile, char *name, int b, unsigned long size, unsigned long lu_timestamp) {
+
+    struct ar_header member_hdr;
+    memset (&member_hdr, ' ', sizeof (member_hdr));
+    
+    if (!b) {
+    
+        memcpy (member_hdr.name, name, strlen (name));
+        member_hdr.name[strlen(name)] = 0x2F;
+    
+    } else {
+    
+        member_hdr.name[0] = 0x2F;
+        memcpy (member_hdr.name + 1, name, strlen (name));
+    
+    }
+    
+    member_hdr.mtime[sprintf (member_hdr.mtime, "%lu", lu_timestamp)] = ' ';
+    
+    member_hdr.owner[0] = '0';
+    member_hdr.group[0] = '0';
+    member_hdr.mode[0] = '0';
+    
+    member_hdr.size[sprintf (member_hdr.size, "%lu", size)] = ' ';
+    memcpy (member_hdr.endsig, "`\n", 2);
+    
+    return write_data (outfile, &member_hdr, sizeof (member_hdr));
+
+}
+
+struct data_descriptor {
+
+    unsigned char Architecture[2];
+    unsigned char a[2];
+    unsigned char Id[4];
+    unsigned char Length[4];
+    unsigned char b[4];
+    unsigned char Flags[4];
+
+};
+
+struct section_descriptor_long {
+
+    unsigned char SectionName[16];
+    unsigned char Length[4];
+    unsigned char Offset[4];
+    unsigned char AOffset[4];
+    unsigned char a[4];
+    unsigned char ACount[4];
+    unsigned char b[4];
+
+};
+
+struct section_descriptor_short {
+
+    union {
+    
+        unsigned char SectionName[8];
+        
+        struct {
+        
+            unsigned char a[4];
+            unsigned char Offset[4];
+        
+        } x;
+    
+    } z;
+    
+    unsigned char b[4];
+    unsigned char c[4];
+    unsigned char type[2];
+
+};
+
+unsigned char g_Data0[12] = { 0x02, 0x00, 0x00, 0x00, 0x34, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+unsigned char g_Data1[41] = {
+
+    0x27, 0x00, 0x13, 0x10, 0x07, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x0C, 0x00, 0x00, 0x00, 0x0D, 0x52, 0x12, 0x4D, 0x69, 0x63, 0x72, 0x6F, 0x73, 0x6F, 0x66, 0x74,
+    0x20, 0x28, 0x52, 0x29, 0x20, 0x4C, 0x49, 0x4E, 0x4B
+
+};
+
+unsigned char g_Data2[20] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+struct data_entry {
+
+    unsigned char a[4];
+    unsigned char b[4];
+    unsigned char c[2];
+
+};
+
+static void write_implib (struct export_name *export_names, unsigned long num_names, unsigned long ordinal_base) {
+
+    struct symbol_info *info_list, *info, *next_info;
+    unsigned long *offsets, offset_count, symbol_count, length, i;
+    
+    unsigned long module_name_length;
+    char *header_name, *module_name;
+    
+    unsigned long offset = 0, offset2 = 0, offset3 = 0;
+    int bHeaderName;
+    
+    FILE *outfile;
+    unsigned long pad_length, pad[2];
+    
+    struct data_entry data_entry;
+    struct data_descriptor data_descriptor;
+    struct section_descriptor_long section_descriptor_long;
+    struct section_descriptor_short section_descriptor_short;
+    
+    info_list = create_symbol_list (export_names, num_names);
+    
+    offset_count = 2 + 3 + num_names;
+    offsets = xmalloc (offset_count * 4);
+    
+    module_name_length = strlen (state->output_filename);
+    module_name = xstrdup (state->output_filename);
+    
+    if (module_name_length + 1 > 16) {
+    
+        header_name = xstrdup ("0");
+        bHeaderName = 1;
+    
+    } else {
+    
+        header_name = xstrdup (module_name);
+        bHeaderName = 0;
+    
+    }
+    
+    if (!(outfile = fopen (output_implib_filename, "wb"))) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "failed to open '%s' for writing", output_implib_filename);
+        return;
+    
+    }
+    
+    offset += write_data (outfile, "!<arch>\n", 8);
+    
+    offsets[0] = offset;
+    
+    fseek (outfile, sizeof (struct ar_header), SEEK_CUR);
+    offset2 = ftell (outfile);
+    
+    symbol_count = swap_bytes (3 + num_names, 4);
+    offset2 += write_data (outfile, &symbol_count, 4);
+    
+    fseek (outfile, (3 + num_names) * 4, SEEK_CUR);
+    offset2 = ftell (outfile);
+    
+    for (info = info_list; info; info = info->next) {
+        offset2 += write_data (outfile, info->name, info->name_length + 1);
+    }
+    
+    fseek (outfile, offset, SEEK_SET);
+    offset += write_file_header (outfile, "", 0, (offset2 - (offset + sizeof (struct ar_header))), 0);
+    
+    fseek (outfile, offset2, SEEK_SET);
+    
+    if ((offset2 & 1)) {
+        offset2 += write_data (outfile, "\n", 1);
+    }
+    
+    length = module_name_length + 1;
+    
+    if (length > 16) {
+    
+        offset2 += write_file_header (outfile, "/", 0, length, 0);
+        offset2 += write_data (outfile, module_name, length);
+        
+        if ((length + 1) & 1) {
+            offset2 += write_data (outfile, "\n", 1);
+        }
+    
+    }
+    
+    offsets[1] = offset = offset2;
+    
+    fseek (outfile, sizeof (struct ar_header), SEEK_CUR);
+    offset2 += sizeof (struct ar_header);
+    
+    length  = sizeof (struct data_descriptor) + (sizeof (struct section_descriptor_long) * 3);
+    length += sizeof (g_Data0) + 1 + module_name_length + sizeof (g_Data1);
+    length += sizeof (g_Data2) + (sizeof (struct data_entry) * 3);
+    length += module_name_length + 1;
+    
+    integer_to_array (IMAGE_FILE_MACHINE_I386, data_descriptor.Architecture, 2);
+    integer_to_array (3, data_descriptor.a, 2);
+    integer_to_array (0, data_descriptor.Id, 4);
+    integer_to_array (length, data_descriptor.Length, 4);
+    integer_to_array (8, data_descriptor.b, 4);
+    integer_to_array (0x1000000, data_descriptor.Flags, 4);
+    
+    offset2 += write_data (outfile, &data_descriptor, sizeof (data_descriptor));
+    
+    length = sizeof (g_Data0) + 1 + module_name_length + sizeof (g_Data1);
+    offset3 = sizeof (struct data_descriptor) + (sizeof (struct section_descriptor_long) * 3);
+    
+    memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
+    strcpy ((char *) section_descriptor_long.SectionName, ".debug$S");
+    
+    integer_to_array (length, section_descriptor_long.Length, 4);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4);
+    integer_to_array (0x42100040, section_descriptor_long.b, 4);
+    
+    offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
+    
+    offset3 += length;
+    length = sizeof (g_Data2);
+    
+    memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
+    strcpy ((char *) section_descriptor_long.SectionName, ".idata$2");
+    
+    integer_to_array (length, section_descriptor_long.Length, 4);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4);
+    integer_to_array (offset3 + length, section_descriptor_long.AOffset, 4);
+    integer_to_array (3, section_descriptor_long.ACount, 4);
+    integer_to_array (0xC0300040, section_descriptor_long.b, 4);
+    
+    offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
+    
+    offset3 += length + (sizeof (struct data_entry) * 3);
+    length = module_name_length + 1;
+    
+    memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
+    strcpy ((char *) section_descriptor_long.SectionName, ".idata$6");
+    
+    integer_to_array (length, section_descriptor_long.Length, 4);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4);
+    integer_to_array (0xC0200040, section_descriptor_long.b, 4);
+    
+    offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
+    offset2 += write_data (outfile, g_Data0, sizeof (g_Data0));
+    offset2 += write_data (outfile, &module_name_length, 1);
+    offset2 += write_data (outfile, module_name, module_name_length);
+    offset2 += write_data (outfile, g_Data1, sizeof (g_Data1));
+    offset2 += write_data (outfile, g_Data2, sizeof (g_Data2));
+    
+    integer_to_array (12, data_entry.a, 4);
+    integer_to_array (3, data_entry.b, 4);
+    integer_to_array (7, data_entry.c, 2);
+    
+    offset2 += write_data (outfile, &data_entry, sizeof (data_entry));
+    
+    integer_to_array (0, data_entry.a, 4);
+    integer_to_array (4, data_entry.b, 4);
+    integer_to_array (7, data_entry.c, 2);
+    
+    offset2 += write_data (outfile, &data_entry, sizeof (data_entry));
+    
+    integer_to_array (16, data_entry.a, 4);
+    integer_to_array (5, data_entry.b, 4);
+    integer_to_array (7, data_entry.c, 2);
+    
+    offset2 += write_data (outfile, &data_entry, sizeof (data_entry));
+    offset2 += write_data (outfile, module_name, module_name_length + 1);
+    
+    memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
+    memcpy ((char *) section_descriptor_short.z.SectionName, "@comp.id", 8);
+    
+    integer_to_array (0xDD520D, section_descriptor_short.b, 4);
+    integer_to_array (0xFFFF, section_descriptor_short.c, 4);
+    integer_to_array (3, section_descriptor_short.type, 2);
+    
+    offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
+    offset3 = 4;
+    
+    memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
+    
+    integer_to_array (offset3, section_descriptor_short.z.x.Offset, 4);
+    integer_to_array (2, section_descriptor_short.c, 4);
+    integer_to_array (2, section_descriptor_short.type, 2);
+    
+    offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
+    
+    memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
+    strcpy ((char *) section_descriptor_short.z.SectionName, ".idata$2");
+    
+    integer_to_array (0xC0000040, section_descriptor_short.b, 4);
+    integer_to_array (2, section_descriptor_short.c, 4);
+    integer_to_array (0x68, section_descriptor_short.type, 2);
+    
+    offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
+    
+    memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
+    strcpy ((char *) section_descriptor_short.z.SectionName, ".idata$6");
+    
+    integer_to_array (0, section_descriptor_short.b, 4);
+    integer_to_array (3, section_descriptor_short.c, 4);
+    integer_to_array (3, section_descriptor_short.type, 2);
+    
+    offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
+    
+    memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
+    strcpy ((char *) section_descriptor_short.z.SectionName, ".idata$4");
+    
+    integer_to_array (0xC0000040, section_descriptor_short.b, 4);
+    integer_to_array (0, section_descriptor_short.c, 4);
+    integer_to_array (0x68, section_descriptor_short.type, 2);
+    
+    offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
+    
+    memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
+    strcpy ((char *) section_descriptor_short.z.SectionName, ".idata$5");
+    
+    integer_to_array (0xC0000040, section_descriptor_short.b, 4);
+    integer_to_array (0, section_descriptor_short.c, 4);
+    integer_to_array (0x68, section_descriptor_short.type, 2);
+    
+    offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
+    
+    for (info = info_list, i = 0; i < 2; info = info->next, i++) {
+    
+        memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
+        offset3 += info->name_length + 1;
+        
+        integer_to_array (offset3, section_descriptor_short.z.x.Offset, 4);
+        integer_to_array (0, section_descriptor_short.c, 4);
+        integer_to_array (2, section_descriptor_short.type, 2);
+        
+        offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
+    
+    }
+    
+    offset3 += info->name_length + 1;
+    offset2 += write_data (outfile, &offset3, 4);
+    
+    for (info = info_list, i = 0; i < 3; info = info->next, i++) {
+        offset2 += write_data (outfile, (char *) info->name, info->name_length + 1);
+    }
+    
+    fseek (outfile, offset, SEEK_SET);
+    
+    offset3 = offset2 + write_file_header (outfile, header_name, bHeaderName, offset2 - (offset + sizeof (struct ar_header)), 0);
+    fseek (outfile, offset2, SEEK_SET);
+    
+    if ((offset2 & 1)) {
+        offset2 += write_data (outfile, "\n", 1);
+    }
+    
+    offsets[2] = offset = offset2;
+    
+    fseek (outfile, sizeof (struct ar_header), SEEK_CUR);
+    offset2 += sizeof (struct ar_header);
+    
+    length  = sizeof (struct data_descriptor) + (sizeof (struct section_descriptor_long) * 2);
+    length += sizeof (g_Data0) + 1 + module_name_length + sizeof (g_Data1);
+    length += sizeof (g_Data2);
+    
+    integer_to_array (IMAGE_FILE_MACHINE_I386, data_descriptor.Architecture, 2);
+    integer_to_array (2, data_descriptor.a, 2);
+    integer_to_array (0, data_descriptor.Id, 4);
+    integer_to_array (length, data_descriptor.Length, 4);
+    integer_to_array (2, data_descriptor.b, 4);
+    integer_to_array (0x1000000, data_descriptor.Flags, 4);
+    
+    offset2 += write_data (outfile, &data_descriptor, sizeof (data_descriptor));
+    
+    length = sizeof (g_Data0) + 1 + module_name_length + sizeof (g_Data1);
+    offset3 = sizeof (struct data_descriptor) + (sizeof (struct section_descriptor_long) * 2);
+    
+    memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
+    strcpy ((char *) section_descriptor_long.SectionName, ".debug$S");
+    
+    integer_to_array (length, section_descriptor_long.Length, 4);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4);
+    integer_to_array (0x42100040, section_descriptor_long.b, 4);
+    
+    offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
+    
+    offset3 += length;
+    length = sizeof (g_Data2);
+    
+    memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
+    strcpy ((char *) section_descriptor_long.SectionName, ".idata$3");
+    
+    integer_to_array (length, section_descriptor_long.Length, 4);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4);
+    integer_to_array (0xC0300040, section_descriptor_long.b, 4);
+    
+    offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
+    offset2 += write_data (outfile, g_Data0, sizeof (g_Data0));
+    offset2 += write_data (outfile, &module_name_length, 1);
+    offset2 += write_data (outfile, module_name, module_name_length);
+    offset2 += write_data (outfile, g_Data1, sizeof (g_Data1));
+    offset2 += write_data (outfile, g_Data2, sizeof (g_Data2));
+    
+    memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
+    memcpy ((char *) section_descriptor_short.z.SectionName, "@comp.id", 8);
+    
+    integer_to_array (0xDD520D, section_descriptor_short.b, 4);
+    integer_to_array (0xFFFF, section_descriptor_short.c, 4);
+    integer_to_array (3, section_descriptor_short.type, 2);
+    
+    offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
+    
+    memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
+    offset3 = 4;
+    
+    integer_to_array (offset3, section_descriptor_short.z.x.Offset, 4);
+    integer_to_array (2, section_descriptor_short.c, 4);
+    integer_to_array (2, section_descriptor_short.type, 2);
+    
+    offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
+    length = offset3 + (info_list->next->name_length + 1);
+    
+    offset2 += write_data (outfile, &length, 4);
+    offset2 += write_data (outfile, info_list->next->name, info_list->next->name_length + 1);
+    
+    fseek (outfile, offset, SEEK_SET);
+    
+    offset3 = offset2 + write_file_header (outfile, header_name, bHeaderName, offset2 - (offset + sizeof (struct ar_header)), 0);
+    fseek (outfile, offset2, SEEK_SET);
+    
+    if ((offset2 & 1)) {
+        offset2 += write_data (outfile, "\n", 1);
+    }
+    
+    offsets[3] = offset = offset2;
+    
+    fseek (outfile, sizeof (struct ar_header), SEEK_CUR);
+    offset2 += sizeof (struct ar_header);
+    
+    memset (pad, 0, sizeof (*pad));
+    pad_length = 4;
+    
+    length  = sizeof (struct data_descriptor) + (sizeof (struct section_descriptor_long) * 3);
+    length += sizeof (g_Data0) + 1 + module_name_length + sizeof (g_Data1);
+    length += pad_length + pad_length;
+    
+    integer_to_array (IMAGE_FILE_MACHINE_I386, data_descriptor.Architecture, 2);
+    integer_to_array (3, data_descriptor.a, 2);
+    integer_to_array (0, data_descriptor.Id, 4);
+    integer_to_array (length, data_descriptor.Length, 4);
+    integer_to_array (2, data_descriptor.b, 4);
+    integer_to_array (0x1000000, data_descriptor.Flags, 4);
+    
+    offset2 += write_data (outfile, &data_descriptor, sizeof (data_descriptor));
+    
+    length = sizeof (g_Data0) + 1 + module_name_length + sizeof (g_Data1);
+    offset3 = sizeof (struct data_descriptor) + (sizeof (struct section_descriptor_long) * 3);
+    
+    memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
+    strcpy ((char *) section_descriptor_long.SectionName, ".debug$S");
+    
+    integer_to_array (length, section_descriptor_long.Length, 4);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4);
+    integer_to_array (0x42100040, section_descriptor_long.b, 4);
+    
+    offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
+    
+    offset3 += length;
+    length = pad_length;
+    
+    memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
+    strcpy ((char *) section_descriptor_long.SectionName, ".idata$5");
+    
+    integer_to_array (length, section_descriptor_long.Length, 4);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4);
+    integer_to_array (0xC0300040, section_descriptor_long.b, 4);
+    
+    offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
+    
+    offset3 += length;
+    length = pad_length;
+    
+    memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
+    strcpy ((char *) section_descriptor_long.SectionName, ".idata$4");
+    
+    integer_to_array (length, section_descriptor_long.Length, 4);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4);
+    integer_to_array (0xC0300040, section_descriptor_long.b, 4);
+    
+    offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
+    offset2 += write_data (outfile, g_Data0, sizeof (g_Data0));
+    offset2 += write_data (outfile, &module_name_length, 1);
+    offset2 += write_data (outfile, module_name, module_name_length);
+    offset2 += write_data (outfile, g_Data1, sizeof (g_Data1));
+    
+    offset2 += write_data (outfile, pad, pad_length);
+    offset2 += write_data (outfile, pad, pad_length);
+    
+    memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
+    memcpy ((char *) section_descriptor_short.z.SectionName, "@comp.id", 8);
+    
+    integer_to_array (0xDD520D, section_descriptor_short.b, 4);
+    integer_to_array (0xFFFF, section_descriptor_short.c, 4);
+    integer_to_array (3, section_descriptor_short.type, 2);
+    
+    offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
+    
+    memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
+    offset3 = 4;
+    
+    integer_to_array (offset3, section_descriptor_short.z.x.Offset, 4);
+    integer_to_array (2, section_descriptor_short.c, 4);
+    integer_to_array (2, section_descriptor_short.type, 2);
+    
+    offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
+    length = offset3 + (info_list->next->next->name_length + 1);
+    
+    offset2 += write_data (outfile, &length, 4);
+    offset2 += write_data (outfile, info_list->next->next->name, info_list->next->next->name_length + 1);
+    
+    fseek (outfile, offset, SEEK_SET);
+    
+    offset3 = offset2 + write_file_header (outfile, header_name, bHeaderName, offset2 - (offset + sizeof (struct ar_header)), 0);
+    fseek (outfile, offset2, SEEK_SET);
+    
+    if ((offset2 & 1)) {
+        offset2 += write_data (outfile, "\n", 1);
+    }
+    
+    for (i = 0; i < num_names; i++) {
+    
+        struct pe_import_library_header import_hdr;
+        
+        unsigned short type = 0;
+        char *name;
+        
+        offsets[4 + i] = offset2;
+        
+        offset2 += write_file_header (outfile, header_name, bHeaderName, sizeof (import_hdr) + 1 + strlen (export_names[i].name) + 1 + module_name_length + 1, 0);
+        memset (&import_hdr, 0, sizeof (import_hdr));
+        
+        integer_to_array (0xFFFF, import_hdr.Magic2, 2);
+        integer_to_array (IMAGE_FILE_MACHINE_I386, import_hdr.Machine, 2);
+        integer_to_array (1 + strlen (export_names[i].name) + 1 + module_name_length + 1, import_hdr.SizeOfData, 4);
+        integer_to_array (ordinal_base + i, import_hdr.OrdinalHint, 2);
         
         switch (export_names[i].export_type) {
         
@@ -845,29 +1399,50 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
             type |= IMPORT_NAME_UNDECORATE << 2;
         }
         
-        integer_to_array (type | (IMPORT_NAME_NOPREFIX << 2), import_hdr->Type, 2);
-        pos += sizeof (*import_hdr);
+        integer_to_array (type | (IMPORT_NAME_NOPREFIX << 2), import_hdr.Type, 2);
+        offset2 += write_data (outfile, &import_hdr, sizeof (import_hdr));
         
-        pos += sprintf ((char *) pos, "_%s", export_names[i].name) + 1;
-        pos += sprintf ((char *) pos, "%s", state->output_filename) + 1;
+        name = xmalloc (1 + strlen (export_names[i].name) + 1);
+        sprintf (name, "_%s", export_names[i].name);
         
-        pos = data + ALIGN (pos - data, 2);
+        offset2 += write_data (outfile, name, strlen (name) + 1);
+        offset2 += write_data (outfile, module_name, module_name_length + 1);
+        
+        free (name);
+        
+        if ((offset2 & 1)) {
+            offset2 += write_data (outfile, "\n", 1);
+        }
     
     }
     
-    if (!(outfile = fopen (output_implib_filename, "wb"))) {
+    offset = offset2;
     
-        report_at (program_name, 0, REPORT_ERROR, "failed to open '%s' for writing", output_implib_filename);
-        return;
+    fseek (outfile, offsets[0] + sizeof (struct ar_header) + 4, SEEK_SET);
+    offset2 = ftell (outfile);
     
-    }
+    for (info = info_list, i = 0; info; info = info->next, i++) {
     
-    if (fwrite (data, data_size, 1, outfile) != 1) {
-        report_at (program_name, 0, REPORT_ERROR, "failed whist writing data to '%s'", output_implib_filename);
+        offset3 = offsets[1 + i];
+        offset3 = swap_bytes (offset3, 4);
+        
+        offset2 += write_data (outfile, &offset3, 4);
+    
     }
     
     fclose (outfile);
-    free (data);
+    
+    for (info = info_list; info; info = next_info) {
+    
+        next_info = info->next;
+        
+        free (info->name);
+        free (info);
+    
+    }
+    
+    free (header_name);
+    free (module_name);
 
 }
 
