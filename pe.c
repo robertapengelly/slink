@@ -752,15 +752,28 @@ struct symbol_info *create_symbol_list (struct export_name *export_name, unsigne
     struct symbol_info *info_list = 0;
     struct symbol_info **last_info_list_p = &info_list;
     
+    char *name, *p;
+    const char *module_name;
+    
     struct symbol_info *symbol_info;
     unsigned long i, j;
     
-    char *name = xstrdup (state->output_filename), *p;
+    module_name = state->output_filename;
+    name = strdup (module_name);
     
-    if ((p = strrchr (state->output_filename, '.'))) {
+    if ((p = strrchr (module_name, '/')) || (p = strrchr (module_name, '\\'))) {
     
         free (name);
-        name = xstrndup (state->output_filename, p - state->output_filename);
+        
+        name = xstrndup (p + 1, (p - module_name) - 1);
+        module_name = p + 1;
+    
+    }
+    
+    if ((p = strrchr (module_name, '.'))) {
+    
+        free (name);
+        name = xstrndup (module_name, p - module_name);
     
     }
     
@@ -956,7 +969,7 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     unsigned long *offsets, offset_count, symbol_count, length, i;
     
     unsigned long module_name_length;
-    char *header_name, *module_name;
+    char *header_name, *module_name, *p;
     
     unsigned long offset = 0, offset2 = 0, offset3 = 0;
     int bHeaderName;
@@ -974,8 +987,16 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     offset_count = 2 + 3 + num_names;
     offsets = xmalloc (offset_count * 4);
     
-    module_name_length = strlen (state->output_filename);
     module_name = xstrdup (state->output_filename);
+    
+    if ((p = strrchr (state->output_filename, '/')) || (p = strrchr (state->output_filename, '\\'))) {
+    
+        free (module_name);
+        module_name = xstrndup (p + 1, (p - state->output_filename) - 1);
+    
+    }
+    
+    module_name_length = strlen (module_name);
     
     if (module_name_length + 1 > 16) {
     
