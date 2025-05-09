@@ -755,12 +755,12 @@ struct symbol_info *create_symbol_list (struct export_name *export_name, unsigne
     struct symbol_info *symbol_info;
     unsigned long i, j;
     
-    char *name = xstrdup (output_implib_filename), *p;
+    char *name = xstrdup (state->output_filename), *p;
     
-    if ((p = strrchr (output_implib_filename, '.'))) {
+    if ((p = strrchr (state->output_filename, '.'))) {
     
         free (name);
-        name = xstrndup (output_implib_filename, p - output_implib_filename);
+        name = xstrndup (state->output_filename, p - state->output_filename);
     
     }
     
