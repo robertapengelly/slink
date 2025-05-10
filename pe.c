@@ -295,11 +295,11 @@ void pe_interpret_dot_drectve_section (/*const char *filename, unsigned char *da
         
         if (strncmp (p, "-export:", 8) == 0 || strncmp (p, "/EXPORT:", 8) == 0) {
         
-            char *q, saved_ch;
-            int data;
-            
             struct name_list *name_list;
+            char *q, saved_ch;
+            
             char *comma;
+            int data = 0;
             
             p += 8;
             
@@ -1024,14 +1024,20 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     fseek (outfile, sizeof (struct ar_header), SEEK_CUR);
     offset2 = ftell (outfile);
     
-    symbol_count = swap_bytes (3 + num_names, 4);
+    symbol_count = swap_bytes (3 + (num_names * 2), 4);
     offset2 += write_data (outfile, &symbol_count, 4);
     
-    fseek (outfile, (3 + num_names) * 4, SEEK_CUR);
+    fseek (outfile, (3 + (num_names * 2)) * 4, SEEK_CUR);
     offset2 = ftell (outfile);
     
-    for (info = info_list; info; info = info->next) {
+    for (info = info_list, i = 0; info; info = info->next, i++) {
+    
+        if (i >= 3) {
+            offset2 += write_data (outfile, info->name + 6, (info->name_length - 6) + 1);
+        }
+        
         offset2 += write_data (outfile, info->name, info->name_length + 1);
+    
     }
     
     fseek (outfile, offset, SEEK_SET);
@@ -1429,11 +1435,9 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
         
         }
         
-        if (kill_at) {
-            type |= IMPORT_NAME_UNDECORATE << 2;
-        }
+        type |= (kill_at ? IMPORT_NAME_UNDECORATE : IMPORT_NAME_NOPREFIX) << 2;
         
-        integer_to_array (type | (IMPORT_NAME_NOPREFIX << 2), import_hdr.Type, 2);
+        integer_to_array (type, import_hdr.Type, 2);
         offset2 += write_data (outfile, &import_hdr, sizeof (import_hdr));
         
         name = xmalloc (1 + strlen (export_names[i].name) + 1);
@@ -1459,6 +1463,10 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     
         offset3 = offsets[1 + i];
         offset3 = swap_bytes (offset3, 4);
+        
+        if (i >= 3) {
+            offset2 += write_data (outfile, &offset3, 4);
+        }
         
         offset2 += write_data (outfile, &offset3, 4);
     

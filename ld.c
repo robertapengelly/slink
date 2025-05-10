@@ -112,7 +112,7 @@ static int read_object_file (const char *filename, unsigned char *data, unsigned
     }
     
     report_at (program_name, 0, REPORT_ERROR, "%s: unrecognised file format", filename);
-    return 1;
+    return -1;
 
 }
 
@@ -135,7 +135,7 @@ static int read_archive_memeber (unsigned char *pos, const char *filename) {
     int ret;
     
     if (memcmp (pos, ALREADY_READ, sizeof (ALREADY_READ)) == 0) {
-        return 0;
+        return 1;
     }
     
     hdr = (struct ar_header *) pos;
