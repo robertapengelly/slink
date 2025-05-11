@@ -1162,7 +1162,7 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
-    strcpy ((char *) section_descriptor_short.z.SectionName, ".idata$2");
+    memcpy ((char *) section_descriptor_short.z.SectionName, ".idata$2", 8);
     
     integer_to_array (0xC0000040, section_descriptor_short.b, 4);
     integer_to_array (2, section_descriptor_short.c, 4);
@@ -1171,7 +1171,7 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
-    strcpy ((char *) section_descriptor_short.z.SectionName, ".idata$6");
+    memcpy ((char *) section_descriptor_short.z.SectionName, ".idata$6", 8);
     
     integer_to_array (0, section_descriptor_short.b, 4);
     integer_to_array (3, section_descriptor_short.c, 4);
@@ -1180,7 +1180,7 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
-    strcpy ((char *) section_descriptor_short.z.SectionName, ".idata$4");
+    memcpy ((char *) section_descriptor_short.z.SectionName, ".idata$4", 8);
     
     integer_to_array (0xC0000040, section_descriptor_short.b, 4);
     integer_to_array (0, section_descriptor_short.c, 4);
@@ -1189,7 +1189,7 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
-    strcpy ((char *) section_descriptor_short.z.SectionName, ".idata$5");
+    memcpy ((char *) section_descriptor_short.z.SectionName, ".idata$5", 8);
     
     integer_to_array (0xC0000040, section_descriptor_short.b, 4);
     integer_to_array (0, section_descriptor_short.c, 4);
