@@ -363,12 +363,10 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
         
         if (state->format == LD_FORMAT_BIN || state->format == LD_FORMAT_COM) {
         
-            if (!rel->n_ext/* || (symbol->n_type & N_TYPE) == N_BSS || (symbol->n_type & N_TYPE) == N_DATA || (symbol->n_type & N_TYPE) == N_TEXT*/) {
+            if (symbol->section_number != ABSOLUTE_SECTION_NUMBER && !rel->n_ext) {
             
-                /*report_at (__FILE__, __LINE__, REPORT_FATAL_ERROR, "symbol: %s, %lx", symbol->name, ((rel->symbolnum) >> 28));*/
-                
-                if (rel->n_type != 2) {
-                    report_at (program_name, 0, REPORT_ERROR, "%s:(%s+%#lu): segment relocation", part->of->filename, part->section->name, offset);
+                if (rel->n_type != 2 && symbol->n_type != 2) {
+                    report_at (program_name, 0, REPORT_ERROR, "%s:(%s+%#lu): segment relocation");
                 }
             
             }

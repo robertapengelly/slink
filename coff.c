@@ -18,6 +18,13 @@
 #include    "section.h"
 #include    "write7x.h"
 
+#define     IMAGE_SYM_ABSOLUTE          -1
+#define     IMAGE_SYM_DEBUG             -2
+
+#define     IMAGE_SYM_UNDEFINED         0
+#define     IMAGE_SYM_CLASS_EXTERNAL    2
+#define     IMAGE_SYM_CLASS_STATIC      3
+
 struct string_table_header {
     unsigned char StringTableSize[4];
 };
@@ -30,8 +37,8 @@ struct symbol_table_entry {
     unsigned char SectionNumber[2];
     unsigned char Type[2];
     
-    unsigned char StorageClass;
-    unsigned char NumberOfAuxSymbols;
+    unsigned char StorageClass[1];
+    unsigned char NumberOfAuxSymbols[1];
 
 };
 
@@ -78,6 +85,10 @@ static void translate_relocation (struct reloc_entry *reloc, struct coff_relocat
             report_at (program_name, 0, REPORT_FATAL_ERROR, "invalid relocation type 0x%04hx (origin object '%s')", array_to_integer (input->Type, 2), part->of->filename);
             exit (EXIT_FAILURE);
     
+    }
+    
+    if (reloc->symbol->section_number == IMAGE_SYM_CLASS_STATIC) {
+        reloc->n_type = reloc->symbol->section_number;
     }
 
 }
@@ -190,12 +201,6 @@ static unsigned long translate_Characteristics_to_section_flags (unsigned long C
     return flags;
 
 }
-
-#define     IMAGE_SYM_ABSOLUTE          -1
-#define     IMAGE_SYM_DEBUG             -2
-
-#define     IMAGE_SYM_UNDEFINED         0
-#define     IMAGE_SYM_CLASS_EXTERNAL    2
 
 void read_coff_object (const char *filename, unsigned char *data, unsigned long data_size) {
 
@@ -363,6 +368,7 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         part_p_array[i + 1] = part;
     
     }
+    
     no_syms = array_to_integer (coff_hdr->NumberOfSymbols, 4);
     
     for (i = 0; i < no_syms; i++) {
@@ -461,15 +467,19 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         
         }
         
-        if (coff_symbol->StorageClass == IMAGE_SYM_CLASS_EXTERNAL || section_no == IMAGE_SYM_UNDEFINED) {
+        if (coff_symbol->StorageClass[0] == IMAGE_SYM_CLASS_STATIC) {
+            symbol->n_type = 2;
+        }
+        
+        if (coff_symbol->StorageClass[0] == IMAGE_SYM_CLASS_EXTERNAL || section_no == IMAGE_SYM_UNDEFINED) {
             symbol_record_external_symbol (symbol);
         }
         
-        if (coff_symbol->NumberOfAuxSymbols) {
+        if (coff_symbol->NumberOfAuxSymbols[0]) {
         
             unsigned long j;
             
-            for (j = 0; j < coff_symbol->NumberOfAuxSymbols; j++) {
+            for (j = 0; j < coff_symbol->NumberOfAuxSymbols[0]; j++) {
             
                 symbol = of->symbol_arr + i + 1 + j;
                 
@@ -478,7 +488,7 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
             
             }
             
-            i += coff_symbol->NumberOfAuxSymbols;
+            i += coff_symbol->NumberOfAuxSymbols[1];
         
         }
     

@@ -974,13 +974,14 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     unsigned long offset = 0, offset2 = 0, offset3 = 0;
     int bHeaderName;
     
-    FILE *outfile;
     unsigned long pad_length, pad[2];
+    FILE *outfile;
     
-    struct data_entry data_entry;
-    struct data_descriptor data_descriptor;
-    struct section_descriptor_long section_descriptor_long;
     struct section_descriptor_short section_descriptor_short;
+    struct section_descriptor_long section_descriptor_long;
+    
+    struct data_descriptor data_descriptor;
+    struct data_entry data_entry;
     
     info_list = create_symbol_list (export_names, num_names);
     
@@ -1017,9 +1018,7 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     
     }
     
-    offset += write_data (outfile, "!<arch>\n", 8);
-    
-    offsets[0] = offset;
+    offsets[0] = (offset += write_data (outfile, "!<arch>\n", 8));
     
     fseek (outfile, sizeof (struct ar_header), SEEK_CUR);
     offset2 = ftell (outfile);
