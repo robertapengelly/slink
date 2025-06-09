@@ -366,7 +366,7 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
             if (symbol->section_number != ABSOLUTE_SECTION_NUMBER && !rel->n_ext) {
             
                 if (rel->n_type != 2 && symbol->n_type != 2) {
-                    report_at (program_name, 0, REPORT_ERROR, "%s:(%s+%#lu): segment relocation");
+                    report_at (program_name, 0, REPORT_ERROR, "%s:(%s+%#lu): segment relocation", part->of->filename, part->section->name, offset);
                 }
             
             }
