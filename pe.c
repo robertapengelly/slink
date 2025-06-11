@@ -759,7 +759,7 @@ struct symbol_info *create_symbol_list (struct export_name *export_name, unsigne
     unsigned long i, j;
     
     module_name = state->output_filename;
-    name = strdup (module_name);
+    name = xstrdup (module_name);
     
     if ((p = strrchr (module_name, '/')) || (p = strrchr (module_name, '\\'))) {
     
