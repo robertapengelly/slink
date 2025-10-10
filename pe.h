@@ -4,9 +4,6 @@
 #ifndef     _PE_H
 #define     _PE_H
 
-#define     DEFAULT_SECTION_ALIGNMENT                       0x1000
-#define     DEFAULT_FILE_ALIGNMENT                          0x0200
-
 struct msdos_header {
 
     unsigned char e_magic[2];           /* Magic number                         */

@@ -23,8 +23,7 @@ struct ld_state {
     int emit_relocs, use_custom_base_address;
     unsigned long size_of_headers;
     
-    int generate_symbols_table;
-    int emulation;
+    int emulation, generate_symbols_table, impure;
 
 };
 
@@ -55,6 +54,9 @@ struct ld_state {
 
 extern struct ld_state *state;
 extern const char *program_name;
+
+#define     DEFAULT_SECTION_ALIGNMENT       0x1000
+#define     DEFAULT_FILE_ALIGNMENT          0x0200
 
 void map_write (const char *filename);
 void link (void);

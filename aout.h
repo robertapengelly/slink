@@ -47,8 +47,10 @@ struct aout_nlist {
 
 #define     N_TYPE                      0x1e
 
-void aout_write (const char *filename);
 void read_aout_object (const char *filename, unsigned char *data, unsigned long data_size);
+
+void aout_before_link (void);
+void aout_write (const char *filename);
 
 #define     OMAGIC                      0407
 #define     ZMAGIC                      0413

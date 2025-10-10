@@ -61,7 +61,9 @@ struct elks_nlist {
 #define     N_TYPE                      0x1e
 #define     ELKS_MAGIC                  0403
 
-void elks_write (const char *filename);
 void read_elks_object (const char *filename, unsigned char *data, unsigned long data_size);
+
+void elks_before_link (void);
+void elks_write (const char *filename);
 
 #endif      /* _ELKS_H */

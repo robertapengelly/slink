@@ -4,9 +4,6 @@
 #ifndef     _MZ_H
 #define     _MZ_H
 
-#define     DEFAULT_SECTION_ALIGNMENT       0x1000
-#define     DEFAULT_FILE_ALIGNMENT          0x0200
-
 struct mz_exec {
 
     unsigned char e_magic[2];           /* Magic number                         */

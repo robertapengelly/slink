@@ -361,8 +361,12 @@ int main (int argc, char **argv) {
     
     }
     
-    if (state->format == LD_FORMAT_I386_COFF) {
+    if (state->format == LD_FORMAT_I386_AOUT) {
+        aout_before_link ();
+    } else if (state->format == LD_FORMAT_I386_COFF) {
         coff_before_link ();
+    } else if (state->format == LD_FORMAT_I386_ELKS) {
+        elks_before_link ();
     } else if (state->format == LD_FORMAT_I386_PE) {
         pe_before_link ();
     }

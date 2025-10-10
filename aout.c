@@ -12,6 +12,8 @@
 #include    "section.h"
 #include    "symbol.h"
 
+static unsigned long section_alignment = DEFAULT_SECTION_ALIGNMENT;
+
 static void translate_relocation (struct reloc_entry *reloc, struct aout_relocation_info *input_reloc, struct section_part *part, struct aout_exec *exec_p) {
 
     unsigned long r_symbolnum = array_to_integer (input_reloc->r_symbolnum, 4);
@@ -463,9 +465,10 @@ void aout_write (const char *filename) {
     FILE *fp;
     
     unsigned char *data, *pos;
-    unsigned long data_size;
+    unsigned long image_size;
     
     struct section *text_section, *data_section, *bss_section;
+    unsigned long text_size = 0, data_size = 0, bss_size = 0;
     
     struct aout_exec exec;
     memset (&exec, 0, sizeof (exec));
@@ -483,29 +486,40 @@ void aout_write (const char *filename) {
     
     integer_to_array (OMAGIC, exec.a_info, 4);
     
-    if (data_section) {
+    if (text_section) {
     
-        integer_to_array (data_section->rva, exec.a_text, 4);
-        
-        if (bss_section) {
-            integer_to_array (bss_section->rva - data_section->rva, exec.a_data, 4);
+        if (state->impure) {
+            text_size = text_section->total_size;
         } else {
-            integer_to_array (data_section->total_size, exec.a_data, 4);
-        }
-    
-    } else {
-    
-        integer_to_array (0, exec.a_data, 4);
-        
-        if (bss_section) {
-            integer_to_array (bss_section->rva, exec.a_text, 4);
-        } else {
-            integer_to_array (text_section ? text_section->total_size : 0, exec.a_text, 4);
+            text_size = ALIGN (text_section->total_size, section_alignment);
         }
     
     }
     
-    integer_to_array (bss_section ? bss_section->total_size : 0, exec.a_bss, 4);
+    if (data_section) {
+    
+        if (state->impure) {
+            data_size = data_section->total_size;
+        } else {
+            data_size = ALIGN (data_section->total_size, section_alignment);
+        }
+    
+    }
+    
+    if (bss_section) {
+    
+        if (state->impure) {
+            bss_size = bss_section->total_size;
+        } else {
+            bss_size = ALIGN (bss_section->total_size, section_alignment);
+        }
+    
+    }
+    
+    integer_to_array (text_size, exec.a_text, 4);
+    integer_to_array (data_size, exec.a_data, 4);
+    
+    integer_to_array (bss_size, exec.a_bss, 4);
     integer_to_array (state->entry_point, exec.a_entry, 4);
     
     if (text_section) {
@@ -516,14 +530,14 @@ void aout_write (const char *filename) {
         integer_to_array (section_get_num_relocs (data_section) * sizeof (struct aout_relocation_info), exec.a_drsize, 4);
     }
     
-    data_size = sizeof (exec);
+    image_size = sizeof (exec);
     
-    data_size += (array_to_integer (exec.a_text, 4) + array_to_integer (exec.a_data, 4));
-    data_size += (array_to_integer (exec.a_trsize, 4) + array_to_integer (exec.a_drsize, 4));
+    image_size += (array_to_integer (exec.a_text, 4) + array_to_integer (exec.a_data, 4));
+    image_size += (array_to_integer (exec.a_trsize, 4) + array_to_integer (exec.a_drsize, 4));
     
-    data_size += 4;
+    image_size += 4;
     
-    data = xmalloc (data_size);
+    data = xmalloc (image_size);
     memcpy (data, &exec, sizeof (exec));
     
     pos = data + sizeof (exec);
@@ -550,11 +564,30 @@ void aout_write (const char *filename) {
     
     integer_to_array (4, pos, 4);
     
-    if (fwrite (data, data_size, 1, fp) != 1) {
+    if (fwrite (data, image_size, 1, fp) != 1) {
         report_at (program_name, 0, REPORT_ERROR, "failed to write data to '%s'", filename);
     }
     
     free (data);
     fclose (fp);
+
+}
+
+
+void aout_before_link (void) {
+
+    if (!state->impure) {
+    
+        struct section *section;
+        
+        for (section = all_sections; section; section = section->next) {
+        
+            if (section->section_alignment < section_alignment) {
+                section->section_alignment = section_alignment;
+            }
+        
+        }
+    
+    }
 
 }

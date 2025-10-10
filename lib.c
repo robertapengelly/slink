@@ -41,16 +41,17 @@ static struct options_with_use emulation_table[] = {
 #define     LD_OPTION_FORMAT                                4
 #define     LD_OPTION_GENERATE_SYMBOLS_TABLE                5
 #define     LD_OPTION_HELP                                  6
-#define     LD_OPTION_IMAGE_BASE                            7
-#define     LD_OPTION_MAP                                   8
-#define     LD_OPTION_MAP_FILE                              9
-#define     LD_OPTION_OUTFILE                               10
+#define     LD_OPTION_IMPURE                                7
+#define     LD_OPTION_IMAGE_BASE                            8
+#define     LD_OPTION_MAP                                   9
+#define     LD_OPTION_MAP_FILE                              10
+#define     LD_OPTION_OUTFILE                               11
 
 static struct ld_option opts[] = {
 
     {   "-M",                           LD_OPTION_TYPE_SHORT,       LD_OPTION_MAP,                          LD_OPTION_NO_ARG    },
     {   "-Map",                         LD_OPTION_TYPE_SHORT,       LD_OPTION_MAP_FILE,                     LD_OPTION_HAS_ARG   },
-    {   "-N",                           LD_OPTION_TYPE_SHORT,       LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
+    {   "-N",                           LD_OPTION_TYPE_SHORT,       LD_OPTION_IMPURE,                       LD_OPTION_NO_ARG    },
     
     {   "-e",                           LD_OPTION_TYPE_SHORT,       LD_OPTION_ENTRY,                        LD_OPTION_HAS_ARG   },
     {   "-m",                           LD_OPTION_TYPE_SHORT,       LD_OPTION_EMULATION,                    LD_OPTION_HAS_ARG   },
@@ -64,7 +65,7 @@ static struct ld_option opts[] = {
     {   "--help",                       LD_OPTION_TYPE_LONG,        LD_OPTION_HELP,                         LD_OPTION_NO_ARG    },
     {   "--image-base",                 LD_OPTION_TYPE_LONG,        LD_OPTION_IMAGE_BASE,                   LD_OPTION_HAS_ARG   },
     {   "--oformat",                    LD_OPTION_TYPE_LONG,        LD_OPTION_FORMAT,                       LD_OPTION_HAS_ARG   },
-    {   "--omagic",                     LD_OPTION_TYPE_LONG,        LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
+    {   "--omagic",                     LD_OPTION_TYPE_LONG,        LD_OPTION_IMPURE,                       LD_OPTION_NO_ARG    },
     {   "--output",                     LD_OPTION_TYPE_LONG,        LD_OPTION_OUTFILE,                      LD_OPTION_HAS_ARG   },
     {   "--print-map",                  LD_OPTION_TYPE_LONG,        LD_OPTION_MAP,                          LD_OPTION_NO_ARG    },
     {   "--strip-all",                  LD_OPTION_TYPE_LONG,        LD_OPTION_IGNORED,                      LD_OPTION_NO_ARG    },
@@ -96,7 +97,7 @@ static void print_usage (void) {
         fprintf (stderr, "\n");
         
         fprintf (stderr, "    -M, --print-map                   Print map file on standard output.\n");
-        fprintf (stderr, "    -N, --omagic                      Ignored.\n");
+        fprintf (stderr, "    -N, --omagic                      Do not page align data in a.out and elks.\n");
         
         fprintf (stderr, "\n");
         fprintf (stderr, "    -Map FILE                         Write a linker map to FILE.\n");
@@ -341,6 +342,13 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
         
         }
         
+        case LD_OPTION_IMPURE: {
+        
+            state->impure = 1;
+            break;
+        
+        }
+        
         case LD_OPTION_MAP: {
         
             state->output_map_filename = "";
@@ -386,7 +394,7 @@ unsigned long array_to_integer (unsigned char *arr, int size) {
     int i;
     
     for (i = 0; i < size; i++) {
-        value |= arr[i] << (CHAR_BIT * i);
+        value |= (unsigned long) arr[i] << (CHAR_BIT * i);
     }
     
     return value;
@@ -401,7 +409,7 @@ unsigned long byte_array_to_integer (unsigned char *arr, int size, int big_endia
         int i, j;
         
         for (i = size, j = 0; i > 0; i--, j++) {
-            value |= arr[j] << (CHAR_BIT * (i - 1));
+            value |= (unsigned long) arr[j] << (CHAR_BIT * (i - 1));
         }
         
         return value;
