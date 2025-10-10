@@ -161,10 +161,10 @@ static unsigned long generate_symbols_table (unsigned long offset) {
                 continue;
             }
             
-            integer_to_array (symbol_get_value_no_base (symbol), part->content + pos, 4);
+            integer_to_array (symbol_get_value_no_base (symbol), part->content + pos, 4, 0);
             pos += 4;
             
-            integer_to_array (offset, part->content + pos, 4);
+            integer_to_array (offset, part->content + pos, 4, 0);
             pos += 4;
             
             offset += strlen (symbol->name) + 1;
@@ -302,35 +302,35 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
     
         case 8: {
         
-            result = array_to_integer (part->content + offset, 8);
+            result = array_to_integer (part->content + offset, 8, 0);
             break;
         
         }
         
         case 4: {
         
-            result = array_to_integer (part->content + offset, 4);
+            result = array_to_integer (part->content + offset, 4, 0);
             break;
         
         }
         
         case 3: {
         
-            result = array_to_integer (part->content + offset, 3);
+            result = array_to_integer (part->content + offset, 3, 0);
             break;
         
         }
         
         case 2: {
         
-            result = array_to_integer (part->content + offset, 2);
+            result = array_to_integer (part->content + offset, 2, 0);
             break;
         
         }
         
         case 1: {
         
-            result = array_to_integer (part->content + offset, 1);
+            result = array_to_integer (part->content + offset, 1, 0);
             break;
         
         }
@@ -530,35 +530,35 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
     
         case 8: {
         
-            integer_to_array (result, part->content + offset, 8);
+            integer_to_array (result, part->content + offset, 8, 0);
             break;
         
         }
         
         case 4: {
         
-            integer_to_array (result, part->content + offset, 4);
+            integer_to_array (result, part->content + offset, 4, 0);
             break;
         
         }
         
         case 3: {
         
-            integer_to_array (result, part->content + offset, 3);
+            integer_to_array (result, part->content + offset, 3, 0);
             break;
         
         }
         
         case 2: {
         
-            integer_to_array (result, part->content + offset, 2);
+            integer_to_array (result, part->content + offset, 2, 0);
             break;
         
         }
         
         case 1: {
         
-            integer_to_array (result, part->content + offset, 1);
+            integer_to_array (result, part->content + offset, 1, 0);
             break;
         
         }

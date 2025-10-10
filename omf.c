@@ -40,7 +40,7 @@ static void estimate (void *data, unsigned long data_size, const char *filename,
         big_fields = record_type & 1;
         record_type &= ~1;
         
-        record_len = array_to_integer (pos + 1, 2);
+        record_len = array_to_integer (pos + 1, 2, 0);
         
         {
         
@@ -213,7 +213,7 @@ void read_omf_object (const char *filename, unsigned char *data, unsigned long d
         big_fields = record_type & 1;
         record_type &= ~1;
         
-        record_len = array_to_integer (pos + 1, 2);
+        record_len = array_to_integer (pos + 1, 2, 0);
         pos += 3;
         
         if (record_type == RECORD_TYPE_THEADR) {
@@ -286,9 +286,9 @@ void read_omf_object (const char *filename, unsigned char *data, unsigned long d
                 pubdef_name_len = pubdef_name[prefix - 1];
                 
                 if (big_fields) {
-                    public_offset = array_to_integer (pubdef_name + prefix + pubdef_name_len, 4);
+                    public_offset = array_to_integer (pubdef_name + prefix + pubdef_name_len, 4, 0);
                 } else {
-                    public_offset = array_to_integer (pubdef_name + prefix + pubdef_name_len, 2);
+                    public_offset = array_to_integer (pubdef_name + prefix + pubdef_name_len, 2, 0);
                 }
                 
                 symbol = of->symbol_arr + i_pubdefs++;
@@ -334,14 +334,14 @@ void read_omf_object (const char *filename, unsigned char *data, unsigned long d
             
             if (big_fields) {
             
-                segment_len = array_to_integer (pos + 1, 4);
+                segment_len = array_to_integer (pos + 1, 4, 0);
                 
                 segment_name_index = pos[5];
                 class_name_index = pos[6];
             
             } else {
             
-                segment_len = array_to_integer (pos + 1, 2);
+                segment_len = array_to_integer (pos + 1, 2, 0);
                 
                 segment_name_index = pos[3];
                 class_name_index = pos[4];
@@ -568,14 +568,14 @@ void read_omf_object (const char *filename, unsigned char *data, unsigned long d
             
             if (big_fields) {
             
-                offset = array_to_integer (pos + 1, 4);
+                offset = array_to_integer (pos + 1, 4, 0);
                 
                 size = record_len - 6;
                 data_bytes = pos + 5;
             
             } else {
             
-                offset = array_to_integer (pos + 1, 2);
+                offset = array_to_integer (pos + 1, 2, 0);
                 
                 size = record_len - 4;
                 data_bytes = pos + 3;

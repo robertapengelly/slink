@@ -388,49 +388,32 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
 
 }
 
-unsigned long array_to_integer (unsigned char *arr, int size) {
+unsigned long array_to_integer (unsigned char *arr, int size, int big_endian) {
 
     unsigned long value = 0;
     int i;
     
-    for (i = 0; i < size; i++) {
-        value |= (unsigned long) arr[i] << (CHAR_BIT * i);
+    if (big_endian) {
+    
+        int j;
+        
+        for (i = size, j = 0; i > 0; i--, j++) {
+            value |= (unsigned long) arr[j] << (CHAR_BIT * (i - 1));
+        }
+    
+    } else {
+    
+        for (i = 0; i < size; i++) {
+            value |= (unsigned long) arr[i] << (CHAR_BIT * i);
+        }
+    
     }
     
     return value;
 
 }
 
-unsigned long byte_array_to_integer (unsigned char *arr, int size, int big_endian) {
-
-    if (big_endian) {
-    
-        unsigned long value = 0;
-        int i, j;
-        
-        for (i = size, j = 0; i > 0; i--, j++) {
-            value |= (unsigned long) arr[j] << (CHAR_BIT * (i - 1));
-        }
-        
-        return value;
-    
-    }
-    
-    return array_to_integer (arr, size);
-
-}
-
-void integer_to_array (unsigned long value, unsigned char *dest, int size) {
-
-    int i;
-    
-    for (i = 0; i < size; i++) {
-        dest[i] = (value >> (CHAR_BIT * i)) & UCHAR_MAX;
-    }
-
-}
-
-void integer_to_byte_array (unsigned long value, unsigned char *dest, int size, int big_endian) {
+void integer_to_array (unsigned long value, unsigned char *dest, int size, int big_endian) {
 
     if (big_endian) {
     

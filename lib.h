@@ -19,11 +19,8 @@ struct ld_option {
 #define     LD_OPTION_NO_ARG            0
 #define     LD_OPTION_HAS_ARG           1
 
-unsigned long array_to_integer (unsigned char *arr, int size);
-unsigned long byte_array_to_integer (unsigned char *arr, int size, int big_endian);
-
-void integer_to_array (unsigned long value, unsigned char *dest, int size);
-void integer_to_byte_array (unsigned long value, unsigned char *dest, int size, int big_endian);
+unsigned long array_to_integer (unsigned char *arr, int size, int big_endian);
+void integer_to_array (unsigned long value, unsigned char *dest, int size, int big_endian);
 
 int xstrcasecmp (const char *__s1, const char *__s2);
 

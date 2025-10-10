@@ -44,10 +44,10 @@ struct symbol_table_entry {
 
 static void translate_relocation (struct reloc_entry *reloc, struct coff_relocation_entry *input, struct section_part *part) {
 
-    reloc->symbol = part->of->symbol_arr + array_to_integer (input->SymbolTableIndex, 4);
-    reloc->offset = array_to_integer (input->VirtualAddress, 4);
+    reloc->symbol = part->of->symbol_arr + array_to_integer (input->SymbolTableIndex, 4, 0);
+    reloc->offset = array_to_integer (input->VirtualAddress, 4, 0);
     
-    switch (array_to_integer (input->Type, 2)) {
+    switch (array_to_integer (input->Type, 2, 0)) {
     
         case IMAGE_REL_I386_ABSOLUTE:
         
@@ -82,7 +82,7 @@ static void translate_relocation (struct reloc_entry *reloc, struct coff_relocat
         default:
         
             /* There is no point in continuing, the object is broken. */
-            report_at (program_name, 0, REPORT_FATAL_ERROR, "invalid relocation type 0x%04hx (origin object '%s')", array_to_integer (input->Type, 2), part->of->filename);
+            report_at (program_name, 0, REPORT_FATAL_ERROR, "invalid relocation type 0x%04hx (origin object '%s')", array_to_integer (input->Type, 2, 0), part->of->filename);
             exit (EXIT_FAILURE);
     
     }
@@ -236,10 +236,10 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
     
     coff_hdr = (struct coff_header *) data;
     
-    pos = (unsigned char *) data + array_to_integer (coff_hdr->PointerToSymbolTable, 4) + sizeof (struct symbol_table_entry) * array_to_integer (coff_hdr->NumberOfSymbols, 4);
+    pos = (unsigned char *) data + array_to_integer (coff_hdr->PointerToSymbolTable, 4, 0) + sizeof (struct symbol_table_entry) * array_to_integer (coff_hdr->NumberOfSymbols, 4, 0);
     string_table_hdr = (struct string_table_header *) pos;
     
-    if ((string_table_size = array_to_integer (string_table_hdr->StringTableSize, 4)) < 4) {
+    if ((string_table_size = array_to_integer (string_table_hdr->StringTableSize, 4, 0)) < 4) {
     
         report_at (program_name, 0, REPORT_ERROR, "%s: invalid string table size: %lu", filename, string_table_size);
         return;
@@ -248,10 +248,10 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
     
     string_table = (char *) pos;
     
-    part_p_array = xmalloc (sizeof (*part_p_array) * (array_to_integer (coff_hdr->NumberOfSections, 2) + 1));
-    of = object_file_make (filename, array_to_integer (coff_hdr->NumberOfSymbols, 4));
+    part_p_array = xmalloc (sizeof (*part_p_array) * (array_to_integer (coff_hdr->NumberOfSections, 2, 0) + 1));
+    of = object_file_make (filename, array_to_integer (coff_hdr->NumberOfSymbols, 4, 0));
     
-    no_sections = array_to_integer (coff_hdr->NumberOfSections, 2);
+    no_sections = array_to_integer (coff_hdr->NumberOfSections, 2, 0);
     
     for (i = 0; i < no_sections; i++) {
     
@@ -262,7 +262,7 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         
             unsigned long offset = strtoul (section_name + 1, NULL, 10);
             
-            if (offset < array_to_integer (string_table_hdr->StringTableSize, 4)) {
+            if (offset < array_to_integer (string_table_hdr->StringTableSize, 4, 0)) {
             
                 free (section_name);
                 section_name = xstrdup (string_table + offset);
@@ -279,7 +279,7 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         
         if (state->format == LD_FORMAT_I386_PE && strcmp (section_name, ".drectve") == 0) {
         
-            pe_interpret_dot_drectve_section (/*filename, data, data_size, */data + array_to_integer (section_hdr->PointerToRawData, 4), array_to_integer (section_hdr->SizeOfRawData, 4));
+            pe_interpret_dot_drectve_section (/*filename, data, data_size, */data + array_to_integer (section_hdr->PointerToRawData, 4, 0), array_to_integer (section_hdr->SizeOfRawData, 4, 0));
             
             part_p_array[i + 1] = 0;
             free (section_name);
@@ -288,7 +288,7 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         
         }
         
-        if (array_to_integer (section_hdr->Characteristics, 4) & IMAGE_SCN_LNK_REMOVE) {
+        if (array_to_integer (section_hdr->Characteristics, 4, 0) & IMAGE_SCN_LNK_REMOVE) {
         
             part_p_array[i + 1] = 0;
             
@@ -298,9 +298,9 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         }
         
         section = section_find_or_make (section_name);
-        section->flags = translate_Characteristics_to_section_flags (array_to_integer (section_hdr->Characteristics, 4));
+        section->flags = translate_Characteristics_to_section_flags (array_to_integer (section_hdr->Characteristics, 4, 0));
         
-        if (array_to_integer (section_hdr->PointerToRawData, 4) == 0 && array_to_integer (section_hdr->SizeOfRawData, 4)) {
+        if (array_to_integer (section_hdr->PointerToRawData, 4, 0) == 0 && array_to_integer (section_hdr->SizeOfRawData, 4, 0)) {
             section->is_bss = 1;
         }
         
@@ -313,12 +313,12 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         free (section_name);
         
         part = section_part_new (section, of);
-        part->alignment = translate_Characteristics_to_alignment (array_to_integer (section_hdr->Characteristics, 4));
-        part->content_size = array_to_integer (section_hdr->SizeOfRawData, 4);
+        part->alignment = translate_Characteristics_to_alignment (array_to_integer (section_hdr->Characteristics, 4, 0));
+        part->content_size = array_to_integer (section_hdr->SizeOfRawData, 4, 0);
         
-        if (array_to_integer (section_hdr->PointerToRawData, 4)) {
+        if (array_to_integer (section_hdr->PointerToRawData, 4, 0)) {
         
-            pos = (unsigned char *) data + array_to_integer (section_hdr->PointerToRawData, 4);
+            pos = (unsigned char *) data + array_to_integer (section_hdr->PointerToRawData, 4, 0);
             
             part->content = xmalloc (part->content_size);
             memcpy (part->content, pos, part->content_size);
@@ -332,23 +332,23 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         
         }
         
-        if (array_to_integer (section_hdr->PointerToRelocations, 4) && array_to_integer (section_hdr->NumberOfRelocations, 2)) {
+        if (array_to_integer (section_hdr->PointerToRelocations, 4, 0) && array_to_integer (section_hdr->NumberOfRelocations, 2, 0)) {
         
             unsigned long j, no_relocs;
             
-            if (!array_to_integer (section_hdr->PointerToRawData, 4)) {
+            if (!array_to_integer (section_hdr->PointerToRawData, 4, 0)) {
             
                 report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: section '%s' is BSS but has relocations", filename, section->name);
                 exit (EXIT_FAILURE);
             
             }
             
-            pos = (unsigned char *) data + array_to_integer (section_hdr->PointerToRelocations, 4);
+            pos = (unsigned char *) data + array_to_integer (section_hdr->PointerToRelocations, 4, 0);
             
-            part->reloc_arr = xmalloc (sizeof (struct reloc_entry) * array_to_integer (section_hdr->NumberOfRelocations, 2));
-            part->reloc_cnt = array_to_integer (section_hdr->NumberOfRelocations, 2);
+            part->reloc_arr = xmalloc (sizeof (struct reloc_entry) * array_to_integer (section_hdr->NumberOfRelocations, 2, 0));
+            part->reloc_cnt = array_to_integer (section_hdr->NumberOfRelocations, 2, 0);
             
-            no_relocs = array_to_integer (section_hdr->NumberOfRelocations, 2);
+            no_relocs = array_to_integer (section_hdr->NumberOfRelocations, 2, 0);
             
             for (j = 0; j < no_relocs; j++) {
             
@@ -369,7 +369,7 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
     
     }
     
-    no_syms = array_to_integer (coff_hdr->NumberOfSymbols, 4);
+    no_syms = array_to_integer (coff_hdr->NumberOfSymbols, 4, 0);
     
     for (i = 0; i < no_syms; i++) {
     
@@ -378,13 +378,13 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
         struct symbol_table_entry *coff_symbol;
         short section_no, no_sections;
         
-        coff_symbol = (struct symbol_table_entry *) ((unsigned char *) data + array_to_integer (coff_hdr->PointerToSymbolTable, 4) + sizeof (struct symbol_table_entry) * i);
+        coff_symbol = (struct symbol_table_entry *) ((unsigned char *) data + array_to_integer (coff_hdr->PointerToSymbolTable, 4, 0) + sizeof (struct symbol_table_entry) * i);
         
         if (memcmp (coff_symbol->Name, "\0\0\0\0", 4) == 0) {
         
-            unsigned long offset = array_to_integer (coff_symbol->Name + 4, 4);
+            unsigned long offset = array_to_integer (coff_symbol->Name + 4, 4, 0);
             
-            if (offset < array_to_integer (string_table_hdr->StringTableSize, 4)) {
+            if (offset < array_to_integer (string_table_hdr->StringTableSize, 4, 0)) {
                 symbol->name = xstrdup (string_table + offset);
             } else {
             
@@ -397,13 +397,13 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
             symbol->name = xstrndup ((char *) coff_symbol->Name, 8);
         }
         
-        section_no = array_to_integer (coff_symbol->SectionNumber, 2);
+        section_no = array_to_integer (coff_symbol->SectionNumber, 2, 0);
         
-        symbol->value = array_to_integer (coff_symbol->value, 4);
+        symbol->value = array_to_integer (coff_symbol->value, 4, 0);
         symbol->size = 0;
         symbol->section_number = section_no;
         
-        no_sections = array_to_integer (coff_hdr->NumberOfSections, 2);
+        no_sections = array_to_integer (coff_hdr->NumberOfSections, 2, 0);
         
         if (section_no == IMAGE_SYM_UNDEFINED) {
         
@@ -420,7 +420,7 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
                         bss_section->flags = translate_Characteristics_to_section_flags (IMAGE_SCN_CNT_UNINITIALIZED_DATA | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE);
                         bss_section->is_bss = 1;
                         
-                        bss_section_number = array_to_integer (coff_hdr->NumberOfSections, 2) ? array_to_integer (coff_hdr->NumberOfSections, 2) : 1;
+                        bss_section_number = array_to_integer (coff_hdr->NumberOfSections, 2, 0) ? array_to_integer (coff_hdr->NumberOfSections, 2, 0) : 1;
                     
                     }
                     
@@ -601,12 +601,12 @@ static void generate_base_relocation_block (struct section *section, struct coff
         
         for (i = ((part == saved_part) ? saved_i : 0); i < part->reloc_cnt; i++) {
         
-            integer_to_array (part->rva + relocs[i].offset, ibr_hdr_p->VirtualAddress, 4);
+            integer_to_array (part->rva + relocs[i].offset, ibr_hdr_p->VirtualAddress, 4, 0);
             
             if (relocs[i].howto == &reloc_howtos[RELOC_TYPE_16]) {
-                integer_to_array (IMAGE_REL_I386_DIR16, ibr_hdr_p->Type, 2);
+                integer_to_array (IMAGE_REL_I386_DIR16, ibr_hdr_p->Type, 2, 0);
             } else if (relocs[i].howto == &reloc_howtos[RELOC_TYPE_32]) {
-                integer_to_array (IMAGE_REL_I386_DIR32, ibr_hdr_p->Type, 2);
+                integer_to_array (IMAGE_REL_I386_DIR32, ibr_hdr_p->Type, 2, 0);
             } else {
                 continue;
             }
@@ -708,12 +708,12 @@ static void write_sections (unsigned char *data) {
             write741_to_byte_array (hdr->SizeOfRawData, section->total_size);
             write741_to_byte_array (hdr->PointerToRawData, pos - data);
             
-            if (array_to_integer (hdr->NumberOfRelocations, 2) > 0) {
+            if (array_to_integer (hdr->NumberOfRelocations, 2, 0) > 0) {
                 write741_to_byte_array (hdr->PointerToRelocations, (pos - data) + section->total_size);
             }
             
             section_write (section, pos);
-            pos += (section->total_size + (array_to_integer (hdr->NumberOfRelocations, 2) * sizeof (struct coff_relocation_entry)));
+            pos += (section->total_size + (array_to_integer (hdr->NumberOfRelocations, 2, 0) * sizeof (struct coff_relocation_entry)));
         
         }
         
@@ -723,21 +723,21 @@ static void write_sections (unsigned char *data) {
         if (characteristics & IMAGE_SCN_CNT_CODE) {
         
             if (!base_of_code) {
-                base_of_code = array_to_integer (hdr->VirtualAddress, 4);
+                base_of_code = array_to_integer (hdr->VirtualAddress, 4, 0);
             }
             
-            size_of_code += array_to_integer (hdr->VirtualSize, 4);
+            size_of_code += array_to_integer (hdr->VirtualSize, 4, 0);
         
         } else if (characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) {
         
             if (!base_of_data) {
-                base_of_data = array_to_integer (hdr->VirtualAddress, 4);
+                base_of_data = array_to_integer (hdr->VirtualAddress, 4, 0);
             }
             
-            size_of_initialized_data += array_to_integer (hdr->VirtualSize, 4);
+            size_of_initialized_data += array_to_integer (hdr->VirtualSize, 4, 0);
         
         } else if (characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA) {
-            size_of_uninitialized_data += array_to_integer (hdr->VirtualSize, 4);
+            size_of_uninitialized_data += array_to_integer (hdr->VirtualSize, 4, 0);
         }
         
         last_section = section;
@@ -778,7 +778,7 @@ void coff_after_link (void) {
                     continue;
                 }
                 
-                if (num_relocs && part->rva + relocs[i].offset < array_to_integer (ibr_hdr.VirtualAddress, 4)) {
+                if (num_relocs && part->rva + relocs[i].offset < array_to_integer (ibr_hdr.VirtualAddress, 4, 0)) {
                 
                     generate_base_relocation_block (section, &ibr_hdr, num_relocs, saved_section, saved_part, saved_i);
                     num_relocs = 0;
@@ -787,7 +787,7 @@ void coff_after_link (void) {
                 
                 if (num_relocs == 0) {
                 
-                    integer_to_array (part->rva + relocs[i].offset, ibr_hdr.VirtualAddress, 4);
+                    integer_to_array (part->rva + relocs[i].offset, ibr_hdr.VirtualAddress, 4, 0);
                     
                     saved_section = section;
                     saved_part = part;
@@ -806,7 +806,7 @@ void coff_after_link (void) {
             generate_base_relocation_block (section, &ibr_hdr, num_relocs, saved_section, saved_part, saved_i);
         }
         
-        integer_to_array (num_relocs, hdr->NumberOfRelocations, 2);
+        integer_to_array (num_relocs, hdr->NumberOfRelocations, 2, 0);
     
     }
 
@@ -859,7 +859,7 @@ void coff_write (const char *filename) {
             data_size += section->total_size;
             
             if ((sec_ent = section->object_dependent_data)) {
-                data_size += (array_to_integer (sec_ent->NumberOfRelocations, 2) * sizeof (struct coff_relocation_entry));
+                data_size += (array_to_integer (sec_ent->NumberOfRelocations, 2, 0) * sizeof (struct coff_relocation_entry));
             }
         
         }

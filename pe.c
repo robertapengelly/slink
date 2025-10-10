@@ -487,10 +487,10 @@ static void generate_base_relocation_block (struct section *reloc_section, struc
     struct section *section;
     struct section_part *part;
     
-    integer_to_array (ALIGN (sizeof (*ibr_hdr_p) + num_relocs * 2, 4), ibr_hdr_p->SizeOfBlock, 4);
+    integer_to_array (ALIGN (sizeof (*ibr_hdr_p) + num_relocs * 2, 4), ibr_hdr_p->SizeOfBlock, 4, 0);
     
     reloc_part = section_part_new (reloc_section, object_file_make (FAKE_LD_FILENAME, 0));
-    reloc_part->content_size = array_to_integer (ibr_hdr_p->SizeOfBlock, 4);
+    reloc_part->content_size = array_to_integer (ibr_hdr_p->SizeOfBlock, 4, 0);
     
     reloc_part->content = xmalloc (reloc_part->content_size);
     reloc_part->content[reloc_part->content_size - 2] = reloc_part->content[reloc_part->content_size - 1] = 0;
@@ -516,14 +516,14 @@ static void generate_base_relocation_block (struct section *reloc_section, struc
                     continue;
                 }
                 
-                if (part->rva + relocs[i].offset < array_to_integer (ibr_hdr_p->RVAOfBlock, 4)) {
+                if (part->rva + relocs[i].offset < array_to_integer (ibr_hdr_p->RVAOfBlock, 4, 0)) {
                     continue;
                 }
                 
-                rel_word  = (part->rva + relocs[i].offset - array_to_integer (ibr_hdr_p->RVAOfBlock, 4)) & 0xfff;
+                rel_word  = (part->rva + relocs[i].offset - array_to_integer (ibr_hdr_p->RVAOfBlock, 4, 0)) & 0xfff;
                 rel_word |= base_relocation_type << 12;
                 
-                integer_to_array (rel_word, write_pos, 2);
+                integer_to_array (rel_word, write_pos, 2, 0);
                 write_pos += 2;
                 
                 if (!--num_relocs) {
@@ -632,21 +632,21 @@ static void write_sections (unsigned char *data) {
         if (characteristics & IMAGE_SCN_CNT_CODE) {
         
             if (!base_of_code) {
-                base_of_code = array_to_integer (hdr->VirtualAddress, 4);
+                base_of_code = array_to_integer (hdr->VirtualAddress, 4, 0);
             }
             
-            size_of_code += array_to_integer (hdr->VirtualSize, 4);
+            size_of_code += array_to_integer (hdr->VirtualSize, 4, 0);
         
         } else if (characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA) {
         
             if (!base_of_data) {
-                base_of_data = array_to_integer (hdr->VirtualAddress, 4);
+                base_of_data = array_to_integer (hdr->VirtualAddress, 4, 0);
             }
             
-            size_of_initialized_data += array_to_integer (hdr->VirtualSize, 4);
+            size_of_initialized_data += array_to_integer (hdr->VirtualSize, 4, 0);
         
         } else if (characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA) {
-            size_of_uninitialized_data += array_to_integer (hdr->VirtualSize, 4);
+            size_of_uninitialized_data += array_to_integer (hdr->VirtualSize, 4, 0);
         }
         
         last_section = section;
@@ -1071,12 +1071,12 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     length += sizeof (g_Data2) + (sizeof (struct data_entry) * 3);
     length += module_name_length + 1;
     
-    integer_to_array (IMAGE_FILE_MACHINE_I386, data_descriptor.Architecture, 2);
-    integer_to_array (3, data_descriptor.a, 2);
-    integer_to_array (0, data_descriptor.Id, 4);
-    integer_to_array (length, data_descriptor.Length, 4);
-    integer_to_array (8, data_descriptor.b, 4);
-    integer_to_array (0x1000000, data_descriptor.Flags, 4);
+    integer_to_array (IMAGE_FILE_MACHINE_I386, data_descriptor.Architecture, 2, 0);
+    integer_to_array (3, data_descriptor.a, 2, 0);
+    integer_to_array (0, data_descriptor.Id, 4, 0);
+    integer_to_array (length, data_descriptor.Length, 4, 0);
+    integer_to_array (8, data_descriptor.b, 4, 0);
+    integer_to_array (0x1000000, data_descriptor.Flags, 4, 0);
     
     offset2 += write_data (outfile, &data_descriptor, sizeof (data_descriptor));
     
@@ -1086,9 +1086,9 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
     strcpy ((char *) section_descriptor_long.SectionName, ".debug$S");
     
-    integer_to_array (length, section_descriptor_long.Length, 4);
-    integer_to_array (offset3, section_descriptor_long.Offset, 4);
-    integer_to_array (0x42100040, section_descriptor_long.b, 4);
+    integer_to_array (length, section_descriptor_long.Length, 4, 0);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4, 0);
+    integer_to_array (0x42100040, section_descriptor_long.b, 4, 0);
     
     offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
     
@@ -1098,11 +1098,11 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
     strcpy ((char *) section_descriptor_long.SectionName, ".idata$2");
     
-    integer_to_array (length, section_descriptor_long.Length, 4);
-    integer_to_array (offset3, section_descriptor_long.Offset, 4);
-    integer_to_array (offset3 + length, section_descriptor_long.AOffset, 4);
-    integer_to_array (3, section_descriptor_long.ACount, 4);
-    integer_to_array (0xC0300040, section_descriptor_long.b, 4);
+    integer_to_array (length, section_descriptor_long.Length, 4, 0);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4, 0);
+    integer_to_array (offset3 + length, section_descriptor_long.AOffset, 4, 0);
+    integer_to_array (3, section_descriptor_long.ACount, 4, 0);
+    integer_to_array (0xC0300040, section_descriptor_long.b, 4, 0);
     
     offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
     
@@ -1112,9 +1112,9 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
     strcpy ((char *) section_descriptor_long.SectionName, ".idata$6");
     
-    integer_to_array (length, section_descriptor_long.Length, 4);
-    integer_to_array (offset3, section_descriptor_long.Offset, 4);
-    integer_to_array (0xC0200040, section_descriptor_long.b, 4);
+    integer_to_array (length, section_descriptor_long.Length, 4, 0);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4, 0);
+    integer_to_array (0xC0200040, section_descriptor_long.b, 4, 0);
     
     offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
     offset2 += write_data (outfile, g_Data0, sizeof (g_Data0));
@@ -1123,21 +1123,21 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     offset2 += write_data (outfile, g_Data1, sizeof (g_Data1));
     offset2 += write_data (outfile, g_Data2, sizeof (g_Data2));
     
-    integer_to_array (12, data_entry.a, 4);
-    integer_to_array (3, data_entry.b, 4);
-    integer_to_array (7, data_entry.c, 2);
+    integer_to_array (12, data_entry.a, 4, 0);
+    integer_to_array (3, data_entry.b, 4, 0);
+    integer_to_array (7, data_entry.c, 2, 0);
     
     offset2 += write_data (outfile, &data_entry, sizeof (data_entry));
     
-    integer_to_array (0, data_entry.a, 4);
-    integer_to_array (4, data_entry.b, 4);
-    integer_to_array (7, data_entry.c, 2);
+    integer_to_array (0, data_entry.a, 4, 0);
+    integer_to_array (4, data_entry.b, 4, 0);
+    integer_to_array (7, data_entry.c, 2, 0);
     
     offset2 += write_data (outfile, &data_entry, sizeof (data_entry));
     
-    integer_to_array (16, data_entry.a, 4);
-    integer_to_array (5, data_entry.b, 4);
-    integer_to_array (7, data_entry.c, 2);
+    integer_to_array (16, data_entry.a, 4, 0);
+    integer_to_array (5, data_entry.b, 4, 0);
+    integer_to_array (7, data_entry.c, 2, 0);
     
     offset2 += write_data (outfile, &data_entry, sizeof (data_entry));
     offset2 += write_data (outfile, module_name, module_name_length + 1);
@@ -1145,54 +1145,54 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
     memcpy ((char *) section_descriptor_short.z.SectionName, "@comp.id", 8);
     
-    integer_to_array (0xDD520D, section_descriptor_short.b, 4);
-    integer_to_array (0xFFFF, section_descriptor_short.c, 4);
-    integer_to_array (3, section_descriptor_short.type, 2);
+    integer_to_array (0xDD520D, section_descriptor_short.b, 4, 0);
+    integer_to_array (0xFFFF, section_descriptor_short.c, 4, 0);
+    integer_to_array (3, section_descriptor_short.type, 2, 0);
     
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     offset3 = 4;
     
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
     
-    integer_to_array (offset3, section_descriptor_short.z.x.Offset, 4);
-    integer_to_array (2, section_descriptor_short.c, 4);
-    integer_to_array (2, section_descriptor_short.type, 2);
+    integer_to_array (offset3, section_descriptor_short.z.x.Offset, 4, 0);
+    integer_to_array (2, section_descriptor_short.c, 4, 0);
+    integer_to_array (2, section_descriptor_short.type, 2, 0);
     
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
     memcpy ((char *) section_descriptor_short.z.SectionName, ".idata$2", 8);
     
-    integer_to_array (0xC0000040, section_descriptor_short.b, 4);
-    integer_to_array (2, section_descriptor_short.c, 4);
-    integer_to_array (0x68, section_descriptor_short.type, 2);
+    integer_to_array (0xC0000040, section_descriptor_short.b, 4, 0);
+    integer_to_array (2, section_descriptor_short.c, 4, 0);
+    integer_to_array (0x68, section_descriptor_short.type, 2, 0);
     
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
     memcpy ((char *) section_descriptor_short.z.SectionName, ".idata$6", 8);
     
-    integer_to_array (0, section_descriptor_short.b, 4);
-    integer_to_array (3, section_descriptor_short.c, 4);
-    integer_to_array (3, section_descriptor_short.type, 2);
+    integer_to_array (0, section_descriptor_short.b, 4, 0);
+    integer_to_array (3, section_descriptor_short.c, 4, 0);
+    integer_to_array (3, section_descriptor_short.type, 2, 0);
     
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
     memcpy ((char *) section_descriptor_short.z.SectionName, ".idata$4", 8);
     
-    integer_to_array (0xC0000040, section_descriptor_short.b, 4);
-    integer_to_array (0, section_descriptor_short.c, 4);
-    integer_to_array (0x68, section_descriptor_short.type, 2);
+    integer_to_array (0xC0000040, section_descriptor_short.b, 4, 0);
+    integer_to_array (0, section_descriptor_short.c, 4, 0);
+    integer_to_array (0x68, section_descriptor_short.type, 2, 0);
     
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
     memcpy ((char *) section_descriptor_short.z.SectionName, ".idata$5", 8);
     
-    integer_to_array (0xC0000040, section_descriptor_short.b, 4);
-    integer_to_array (0, section_descriptor_short.c, 4);
-    integer_to_array (0x68, section_descriptor_short.type, 2);
+    integer_to_array (0xC0000040, section_descriptor_short.b, 4, 0);
+    integer_to_array (0, section_descriptor_short.c, 4, 0);
+    integer_to_array (0x68, section_descriptor_short.type, 2, 0);
     
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     
@@ -1201,9 +1201,9 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
         memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
         offset3 += info->name_length + 1;
         
-        integer_to_array (offset3, section_descriptor_short.z.x.Offset, 4);
-        integer_to_array (0, section_descriptor_short.c, 4);
-        integer_to_array (2, section_descriptor_short.type, 2);
+        integer_to_array (offset3, section_descriptor_short.z.x.Offset, 4, 0);
+        integer_to_array (0, section_descriptor_short.c, 4, 0);
+        integer_to_array (2, section_descriptor_short.type, 2, 0);
         
         offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     
@@ -1234,12 +1234,12 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     length += sizeof (g_Data0) + 1 + module_name_length + sizeof (g_Data1);
     length += sizeof (g_Data2);
     
-    integer_to_array (IMAGE_FILE_MACHINE_I386, data_descriptor.Architecture, 2);
-    integer_to_array (2, data_descriptor.a, 2);
-    integer_to_array (0, data_descriptor.Id, 4);
-    integer_to_array (length, data_descriptor.Length, 4);
-    integer_to_array (2, data_descriptor.b, 4);
-    integer_to_array (0x1000000, data_descriptor.Flags, 4);
+    integer_to_array (IMAGE_FILE_MACHINE_I386, data_descriptor.Architecture, 2, 0);
+    integer_to_array (2, data_descriptor.a, 2, 0);
+    integer_to_array (0, data_descriptor.Id, 4, 0);
+    integer_to_array (length, data_descriptor.Length, 4, 0);
+    integer_to_array (2, data_descriptor.b, 4, 0);
+    integer_to_array (0x1000000, data_descriptor.Flags, 4, 0);
     
     offset2 += write_data (outfile, &data_descriptor, sizeof (data_descriptor));
     
@@ -1249,9 +1249,9 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
     strcpy ((char *) section_descriptor_long.SectionName, ".debug$S");
     
-    integer_to_array (length, section_descriptor_long.Length, 4);
-    integer_to_array (offset3, section_descriptor_long.Offset, 4);
-    integer_to_array (0x42100040, section_descriptor_long.b, 4);
+    integer_to_array (length, section_descriptor_long.Length, 4, 0);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4, 0);
+    integer_to_array (0x42100040, section_descriptor_long.b, 4, 0);
     
     offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
     
@@ -1261,9 +1261,9 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
     strcpy ((char *) section_descriptor_long.SectionName, ".idata$3");
     
-    integer_to_array (length, section_descriptor_long.Length, 4);
-    integer_to_array (offset3, section_descriptor_long.Offset, 4);
-    integer_to_array (0xC0300040, section_descriptor_long.b, 4);
+    integer_to_array (length, section_descriptor_long.Length, 4, 0);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4, 0);
+    integer_to_array (0xC0300040, section_descriptor_long.b, 4, 0);
     
     offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
     offset2 += write_data (outfile, g_Data0, sizeof (g_Data0));
@@ -1275,18 +1275,18 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
     memcpy ((char *) section_descriptor_short.z.SectionName, "@comp.id", 8);
     
-    integer_to_array (0xDD520D, section_descriptor_short.b, 4);
-    integer_to_array (0xFFFF, section_descriptor_short.c, 4);
-    integer_to_array (3, section_descriptor_short.type, 2);
+    integer_to_array (0xDD520D, section_descriptor_short.b, 4, 0);
+    integer_to_array (0xFFFF, section_descriptor_short.c, 4, 0);
+    integer_to_array (3, section_descriptor_short.type, 2, 0);
     
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
     offset3 = 4;
     
-    integer_to_array (offset3, section_descriptor_short.z.x.Offset, 4);
-    integer_to_array (2, section_descriptor_short.c, 4);
-    integer_to_array (2, section_descriptor_short.type, 2);
+    integer_to_array (offset3, section_descriptor_short.z.x.Offset, 4, 0);
+    integer_to_array (2, section_descriptor_short.c, 4, 0);
+    integer_to_array (2, section_descriptor_short.type, 2, 0);
     
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     length = offset3 + (info_list->next->name_length + 1);
@@ -1315,12 +1315,12 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     length += sizeof (g_Data0) + 1 + module_name_length + sizeof (g_Data1);
     length += pad_length + pad_length;
     
-    integer_to_array (IMAGE_FILE_MACHINE_I386, data_descriptor.Architecture, 2);
-    integer_to_array (3, data_descriptor.a, 2);
-    integer_to_array (0, data_descriptor.Id, 4);
-    integer_to_array (length, data_descriptor.Length, 4);
-    integer_to_array (2, data_descriptor.b, 4);
-    integer_to_array (0x1000000, data_descriptor.Flags, 4);
+    integer_to_array (IMAGE_FILE_MACHINE_I386, data_descriptor.Architecture, 2, 0);
+    integer_to_array (3, data_descriptor.a, 2, 0);
+    integer_to_array (0, data_descriptor.Id, 4, 0);
+    integer_to_array (length, data_descriptor.Length, 4, 0);
+    integer_to_array (2, data_descriptor.b, 4, 0);
+    integer_to_array (0x1000000, data_descriptor.Flags, 4, 0);
     
     offset2 += write_data (outfile, &data_descriptor, sizeof (data_descriptor));
     
@@ -1330,9 +1330,9 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
     strcpy ((char *) section_descriptor_long.SectionName, ".debug$S");
     
-    integer_to_array (length, section_descriptor_long.Length, 4);
-    integer_to_array (offset3, section_descriptor_long.Offset, 4);
-    integer_to_array (0x42100040, section_descriptor_long.b, 4);
+    integer_to_array (length, section_descriptor_long.Length, 4, 0);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4, 0);
+    integer_to_array (0x42100040, section_descriptor_long.b, 4, 0);
     
     offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
     
@@ -1342,9 +1342,9 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
     strcpy ((char *) section_descriptor_long.SectionName, ".idata$5");
     
-    integer_to_array (length, section_descriptor_long.Length, 4);
-    integer_to_array (offset3, section_descriptor_long.Offset, 4);
-    integer_to_array (0xC0300040, section_descriptor_long.b, 4);
+    integer_to_array (length, section_descriptor_long.Length, 4, 0);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4, 0);
+    integer_to_array (0xC0300040, section_descriptor_long.b, 4, 0);
     
     offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
     
@@ -1354,9 +1354,9 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     memset (&section_descriptor_long, 0, sizeof (section_descriptor_long));
     strcpy ((char *) section_descriptor_long.SectionName, ".idata$4");
     
-    integer_to_array (length, section_descriptor_long.Length, 4);
-    integer_to_array (offset3, section_descriptor_long.Offset, 4);
-    integer_to_array (0xC0300040, section_descriptor_long.b, 4);
+    integer_to_array (length, section_descriptor_long.Length, 4, 0);
+    integer_to_array (offset3, section_descriptor_long.Offset, 4, 0);
+    integer_to_array (0xC0300040, section_descriptor_long.b, 4, 0);
     
     offset2 += write_data (outfile, &section_descriptor_long, sizeof (section_descriptor_long));
     offset2 += write_data (outfile, g_Data0, sizeof (g_Data0));
@@ -1370,18 +1370,18 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
     memcpy ((char *) section_descriptor_short.z.SectionName, "@comp.id", 8);
     
-    integer_to_array (0xDD520D, section_descriptor_short.b, 4);
-    integer_to_array (0xFFFF, section_descriptor_short.c, 4);
-    integer_to_array (3, section_descriptor_short.type, 2);
+    integer_to_array (0xDD520D, section_descriptor_short.b, 4, 0);
+    integer_to_array (0xFFFF, section_descriptor_short.c, 4, 0);
+    integer_to_array (3, section_descriptor_short.type, 2, 0);
     
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     
     memset (&section_descriptor_short, 0, sizeof (section_descriptor_short));
     offset3 = 4;
     
-    integer_to_array (offset3, section_descriptor_short.z.x.Offset, 4);
-    integer_to_array (2, section_descriptor_short.c, 4);
-    integer_to_array (2, section_descriptor_short.type, 2);
+    integer_to_array (offset3, section_descriptor_short.z.x.Offset, 4, 0);
+    integer_to_array (2, section_descriptor_short.c, 4, 0);
+    integer_to_array (2, section_descriptor_short.type, 2, 0);
     
     offset2 += write_data (outfile, &section_descriptor_short, sizeof (section_descriptor_short));
     length = offset3 + (info_list->next->next->name_length + 1);
@@ -1410,10 +1410,10 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
         offset2 += write_file_header (outfile, header_name, bHeaderName, sizeof (import_hdr) + 1 + strlen (export_names[i].name) + 1 + module_name_length + 1, 0);
         memset (&import_hdr, 0, sizeof (import_hdr));
         
-        integer_to_array (0xFFFF, import_hdr.Magic2, 2);
-        integer_to_array (IMAGE_FILE_MACHINE_I386, import_hdr.Machine, 2);
-        integer_to_array (1 + strlen (export_names[i].name) + 1 + module_name_length + 1, import_hdr.SizeOfData, 4);
-        integer_to_array (ordinal_base + i, import_hdr.OrdinalHint, 2);
+        integer_to_array (0xFFFF, import_hdr.Magic2, 2, 0);
+        integer_to_array (IMAGE_FILE_MACHINE_I386, import_hdr.Machine, 2, 0);
+        integer_to_array (1 + strlen (export_names[i].name) + 1 + module_name_length + 1, import_hdr.SizeOfData, 4, 0);
+        integer_to_array (ordinal_base + i, import_hdr.OrdinalHint, 2, 0);
         
         switch (export_names[i].export_type) {
         
@@ -1436,7 +1436,7 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
         
         type |= (kill_at ? IMPORT_NAME_UNDECORATE : IMPORT_NAME_NOPREFIX) << 2;
         
-        integer_to_array (type, import_hdr.Type, 2);
+        integer_to_array (type, import_hdr.Type, 2, 0);
         offset2 += write_data (outfile, &import_hdr, sizeof (import_hdr));
         
         name = xmalloc (1 + strlen (export_names[i].name) + 1);
@@ -1577,14 +1577,14 @@ static void generate_edata (void) {
     ied = (struct pe_export_directory *) part->content;
     memset (ied, 0, sizeof (*ied));
     
-    integer_to_array (name_table_offset, ied->NameRVA, 4);
-    integer_to_array (ordinal_base, ied->OrdinalBase, 4);
-    integer_to_array (num_names, ied->AddressTableEntries, 4);
-    integer_to_array (num_names, ied->NumberOfNamePointers, 4);
-    integer_to_array (sizeof (*ied), ied->ExportAddressTableRVA, 4);
+    integer_to_array (name_table_offset, ied->NameRVA, 4, 0);
+    integer_to_array (ordinal_base, ied->OrdinalBase, 4, 0);
+    integer_to_array (num_names, ied->AddressTableEntries, 4, 0);
+    integer_to_array (num_names, ied->NumberOfNamePointers, 4, 0);
+    integer_to_array (sizeof (*ied), ied->ExportAddressTableRVA, 4, 0);
     
-    integer_to_array (array_to_integer (ied->ExportAddressTableRVA, 4) + num_names * 4, ied->NamePointerRVA, 4);
-    integer_to_array (array_to_integer (ied->NamePointerRVA, 4) + num_names * 4, ied->OrdinalTableRVA, 4);
+    integer_to_array (array_to_integer (ied->ExportAddressTableRVA, 4, 0) + num_names * 4, ied->NamePointerRVA, 4, 0);
+    integer_to_array (array_to_integer (ied->NamePointerRVA, 4, 0) + num_names * 4, ied->OrdinalTableRVA, 4, 0);
     
     for (i = 0; i < 4; i++) {
     
@@ -1616,21 +1616,21 @@ static void generate_edata (void) {
         
         symbol_record_external_symbol (symbol);
         
-        relocs[0].offset = array_to_integer (ied->ExportAddressTableRVA, 4) + 4 * i;
+        relocs[0].offset = array_to_integer (ied->ExportAddressTableRVA, 4, 0) + 4 * i;
         relocs[0].symbol = symbol;
         relocs[0].howto = &reloc_howtos[RELOC_TYPE_32_NO_BASE];
         
         symbol++;
         relocs++;
         
-        relocs[0].offset = array_to_integer (ied->NamePointerRVA, 4) + 4 * i;
+        relocs[0].offset = array_to_integer (ied->NamePointerRVA, 4, 0) + 4 * i;
         relocs[0].symbol = &of->symbol_arr[0];
         relocs[0].howto = &reloc_howtos[RELOC_TYPE_32_NO_BASE];
         
-        integer_to_array (name_table_offset, part->content + relocs[0].offset, 4);
+        integer_to_array (name_table_offset, part->content + relocs[0].offset, 4, 0);
         relocs++;
         
-        integer_to_array (i, part->content + array_to_integer (ied->OrdinalTableRVA, 4) + 2 * i, 4);
+        integer_to_array (i, part->content + array_to_integer (ied->OrdinalTableRVA, 4, 0) + 2 * i, 4, 0);
         
         name = kill_at ? export_names[i].name_no_at : export_names[i].name;
         strcpy ((char *) part->content + name_table_offset, name);
@@ -1673,7 +1673,7 @@ void pe_after_link (void) {
         report_at (program_name, 0, REPORT_INTERNAL_ERROR, ".reloc section could not be found");
     }
     
-    integer_to_array (0, ibr_hdr.RVAOfBlock, 4);
+    integer_to_array (0, ibr_hdr.RVAOfBlock, 4, 0);
     
     for (section = all_sections; section; section = section->next) {
     
@@ -1687,7 +1687,7 @@ void pe_after_link (void) {
                     continue;
                 }
                 
-                if (num_relocs && (part->rva + relocs[i].offset >= array_to_integer (ibr_hdr.RVAOfBlock, 4) + BASE_RELOCATION_PAGE_SIZE || part->rva + relocs[i].offset < array_to_integer (ibr_hdr.RVAOfBlock, 4))) {
+                if (num_relocs && (part->rva + relocs[i].offset >= array_to_integer (ibr_hdr.RVAOfBlock, 4, 0) + BASE_RELOCATION_PAGE_SIZE || part->rva + relocs[i].offset < array_to_integer (ibr_hdr.RVAOfBlock, 4, 0))) {
                 
                     generate_base_relocation_block (reloc_section, &ibr_hdr, num_relocs, saved_section, saved_part, saved_i);
                     num_relocs = 0;
@@ -1696,7 +1696,7 @@ void pe_after_link (void) {
                 
                 if (num_relocs == 0) {
                 
-                    integer_to_array (FLOOR_TO (part->rva + relocs[i].offset, BASE_RELOCATION_PAGE_SIZE), ibr_hdr.RVAOfBlock, 4);
+                    integer_to_array (FLOOR_TO (part->rva + relocs[i].offset, BASE_RELOCATION_PAGE_SIZE), ibr_hdr.RVAOfBlock, 4, 0);
                     
                     saved_section = section;
                     saved_part = part;
@@ -1852,7 +1852,7 @@ void pe_write (const char *filename) {
     write721_to_byte_array (doshdr->e_lfarlc, sizeof (*doshdr));
     write741_to_byte_array (doshdr->e_lfanew, sizeof (*doshdr) + sizeof (dos_stub));
     
-    memcpy ((char *) data + array_to_integer (doshdr->e_lfarlc, 2), dos_stub, sizeof (dos_stub));
+    memcpy ((char *) data + array_to_integer (doshdr->e_lfarlc, 2, 0), dos_stub, sizeof (dos_stub));
     
     
     pehdr->Signature[0] = 'P';
@@ -2187,7 +2187,7 @@ static void import_generate_import (const char *import_name, short ordinal_hint,
     
     part->content = xmalloc (part->content_size = ALIGN (2 + strlen (real_import_name) + 1, 2));
     
-    integer_to_array (ordinal_hint, part->content, 2);
+    integer_to_array (ordinal_hint, part->content, 2, 0);
     strcpy ((char *) part->content + 2, real_import_name);
     
     free (real_import_name);
@@ -2272,11 +2272,11 @@ static void import_generate_head (const char *filename, const char *dll_name) {
     
     import_dt = (struct pe_import_directory_table *) (part->content = xmalloc (part->content_size = sizeof (*import_dt)));
     
-    integer_to_array (0, import_dt->ImportNameTableRVA, 4);
-    integer_to_array (0, import_dt->TimeDateStamp, 4);
-    integer_to_array (0, import_dt->ForwarderChain, 4);
-    integer_to_array (0, import_dt->NameRVA, 4);
-    integer_to_array (0, import_dt->ImportAddressTableRVA, 4);
+    integer_to_array (0, import_dt->ImportNameTableRVA, 4, 0);
+    integer_to_array (0, import_dt->TimeDateStamp, 4, 0);
+    integer_to_array (0, import_dt->ForwarderChain, 4, 0);
+    integer_to_array (0, import_dt->NameRVA, 4, 0);
+    integer_to_array (0, import_dt->ImportAddressTableRVA, 4, 0);
     
     part->reloc_cnt = 3;
     part->reloc_arr = xmalloc (part->reloc_cnt * sizeof (*part->reloc_arr));
@@ -2383,9 +2383,9 @@ void read_pe_import_library (const char *filename, unsigned char *data) {
         return;
     }
     
-    if ((array_to_integer (import_header->Type, 2) & 0x03) == IMPORT_CONST) {
+    if ((array_to_integer (import_header->Type, 2, 0) & 0x03) == IMPORT_CONST) {
     
-        report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "+++ not yet supported import header import Type: 0x%x", array_to_integer (import_header->Type, 2) & 0x3);
+        report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "+++ not yet supported import header import Type: 0x%x", array_to_integer (import_header->Type, 2, 0) & 0x3);
         return;
     
     }
@@ -2409,6 +2409,6 @@ void read_pe_import_library (const char *filename, unsigned char *data) {
     
     }
     
-    import_generate_import (import_name, array_to_integer (import_header->OrdinalHint, 2), array_to_integer (import_header->Type, 2) & 0x03, array_to_integer (import_header->Type, 2) >> 2, filename);
+    import_generate_import (import_name, array_to_integer (import_header->OrdinalHint, 2, 0), array_to_integer (import_header->Type, 2, 0) & 0x03, array_to_integer (import_header->Type, 2, 0) >> 2, filename);
 
 }

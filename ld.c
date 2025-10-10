@@ -200,7 +200,7 @@ static void read_archive (const char *filename, unsigned char *data) {
     free (name);
     pos += sizeof (*hdr);
     
-    no_symbols = byte_array_to_integer (pos, 4, 1);
+    no_symbols = array_to_integer (pos, 4, 1);
     pos += 4;
     
     offset_name_table = xmalloc (sizeof (*offset_name_table) * no_symbols);
@@ -208,7 +208,7 @@ static void read_archive (const char *filename, unsigned char *data) {
     
     for (i = 0; i < no_symbols; i++) {
     
-        offset_name_table[i].offset = byte_array_to_integer (pos, 4, 1);
+        offset_name_table[i].offset = array_to_integer (pos, 4, 1);
         offset_name_table[i].name = (char *) string_table_pos;
         
         string_table_pos += strlen (offset_name_table[i].name) + 1;

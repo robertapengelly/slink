@@ -17,9 +17,9 @@ static unsigned long section_alignment = DEFAULT_SECTION_ALIGNMENT;
 
 static void translate_relocation (struct reloc_entry *reloc, struct elks_relocation_info *input_reloc, struct section_part *part, struct elks_exec *exec_p) {
 
-    unsigned long r_symbolnum = array_to_integer (input_reloc->r_symbolnum, 4);
+    unsigned long r_symbolnum = array_to_integer (input_reloc->r_symbolnum, 4, 0);
     
-    unsigned long r_address = array_to_integer (input_reloc->r_address, 4);
+    unsigned long r_address = array_to_integer (input_reloc->r_address, 4, 0);
     long symbolnum = (r_symbolnum & 0x7ffffff);
     
     if ((r_symbolnum >> 31) & 1) {      /* ext */
@@ -39,12 +39,12 @@ static void translate_relocation (struct reloc_entry *reloc, struct elks_relocat
         } else if (symbolnum == N_DATA) {
         
             reloc->symbol = part->of->symbol_arr + part->of->symbol_cnt - 2;
-            reloc->addend -= array_to_integer (exec_p->a_text, 4);
+            reloc->addend -= array_to_integer (exec_p->a_text, 4, 0);
         
         } else if (symbolnum == N_BSS) {
         
             reloc->symbol = part->of->symbol_arr + part->of->symbol_cnt - 1;
-            reloc->addend -= (array_to_integer (exec_p->a_text, 4) + array_to_integer (exec_p->a_data, 4));
+            reloc->addend -= (array_to_integer (exec_p->a_text, 4, 0) + array_to_integer (exec_p->a_data, 4, 0));
         
         } else {
         
@@ -154,7 +154,7 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
     elks_exec = (struct elks_exec *) pos;
     pos += sizeof (*elks_exec);
     
-    num_symbols = array_to_integer (elks_exec->a_syms, 4) / sizeof (*elks_nlist);
+    num_symbols = array_to_integer (elks_exec->a_syms, 4, 0) / sizeof (*elks_nlist);
     of = object_file_make (filename, num_symbols + 4);
     
     section = section_find_or_make (".text");
@@ -162,7 +162,7 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
     
     part = section_part_new (section, of);
     
-    part->content_size = array_to_integer (elks_exec->a_text, 4);
+    part->content_size = array_to_integer (elks_exec->a_text, 4, 0);
     part->content = xmalloc (part->content_size);
     
     if ((pos - data + part->content_size > data_size) || pos < data) {
@@ -183,7 +183,7 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
     
     part = section_part_new (section, of);
     
-    part->content_size = array_to_integer (elks_exec->a_data, 4);
+    part->content_size = array_to_integer (elks_exec->a_data, 4, 0);
     part->content = xmalloc (part->content_size);
     
     if ((pos - data + part->content_size > data_size) || pos < data) {
@@ -205,12 +205,12 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
     section->is_bss = 1;
     
     part = section_part_new (section, of);
-    part->content_size = array_to_integer (elks_exec->a_bss, 4);
+    part->content_size = array_to_integer (elks_exec->a_bss, 4, 0);
     
     section_append_section_part (section, part);
     part_p_array[3] = part;
     
-    pos += array_to_integer (elks_exec->a_syms, 4) + array_to_integer (elks_exec->a_trsize, 4) + array_to_integer (elks_exec->a_drsize, 4);
+    pos += array_to_integer (elks_exec->a_syms, 4, 0) + array_to_integer (elks_exec->a_trsize, 4, 0) + array_to_integer (elks_exec->a_drsize, 4, 0);
     
     if ((unsigned long) (pos - data + 4) > data_size || pos < data) {
     
@@ -219,7 +219,7 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
     
     }
     
-    strtab_size = array_to_integer (pos, 4);
+    strtab_size = array_to_integer (pos, 4, 0);
     
     if (strtab_size < 4) {
     
@@ -239,15 +239,15 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
     
     }
     
-    pos -= array_to_integer (elks_exec->a_syms, 4);
+    pos -= array_to_integer (elks_exec->a_syms, 4, 0);
     
     for (i = 0; i < num_symbols; i++) {
     
         elks_nlist = (struct elks_nlist *) (pos + (i * sizeof (*elks_nlist)));
         symbol = of->symbol_arr + i;
         
-        if (array_to_integer (elks_nlist->n_strx, 4) < strtab_size) {
-            symbol->name = xstrdup (strtab + array_to_integer (elks_nlist->n_strx, 4));
+        if (array_to_integer (elks_nlist->n_strx, 4, 0) < strtab_size) {
+            symbol->name = xstrdup (strtab + array_to_integer (elks_nlist->n_strx, 4, 0));
         } else {
         
             report_at (program_name, 0, REPORT_FATAL_ERROR, "%s: invalid offset into string table", filename);
@@ -255,7 +255,7 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
         
         }
         
-        symbol->value = array_to_integer (elks_nlist->n_value, 4);
+        symbol->value = array_to_integer (elks_nlist->n_value, 4, 0);
         symbol->size = 0;
         symbol->n_type = elks_nlist->n_type;
         
@@ -309,13 +309,13 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
         
             symbol->section_number = 2;
             symbol->part = part_p_array[2];
-            symbol->value -= array_to_integer (elks_exec->a_text, 4);
+            symbol->value -= array_to_integer (elks_exec->a_text, 4, 0);
         
         } else if ((elks_nlist->n_type & N_TYPE) == N_BSS) {
         
             symbol->section_number = 3;
             symbol->part = part_p_array[3];
-            symbol->value -= (array_to_integer (elks_exec->a_text, 4) + array_to_integer (elks_exec->a_data, 4));
+            symbol->value -= (array_to_integer (elks_exec->a_text, 4, 0) + array_to_integer (elks_exec->a_data, 4, 0));
         
         } else {
         
@@ -343,10 +343,10 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
     
     }
     
-    pos -= (array_to_integer (elks_exec->a_trsize, 4) + array_to_integer (elks_exec->a_drsize, 4));
+    pos -= (array_to_integer (elks_exec->a_trsize, 4, 0) + array_to_integer (elks_exec->a_drsize, 4, 0));
     part = part_p_array[1];
     
-    part->reloc_cnt = array_to_integer (elks_exec->a_trsize, 4) / sizeof (*reloc_info);
+    part->reloc_cnt = array_to_integer (elks_exec->a_trsize, 4, 0) / sizeof (*reloc_info);
     part->reloc_arr = xmalloc (sizeof (*part->reloc_arr) * part->reloc_cnt);
     
     for (i = 0; i < part->reloc_cnt; i++) {
@@ -356,10 +356,10 @@ void read_elks_object (const char *filename, unsigned char *data, unsigned long 
     
     }
     
-    pos += array_to_integer (elks_exec->a_trsize, 4);
+    pos += array_to_integer (elks_exec->a_trsize, 4, 0);
     part = part_p_array[2];
     
-    part->reloc_cnt = array_to_integer (elks_exec->a_drsize, 4) / sizeof (*reloc_info);
+    part->reloc_cnt = array_to_integer (elks_exec->a_drsize, 4, 0) / sizeof (*reloc_info);
     part->reloc_arr = xmalloc (sizeof (*part->reloc_arr) * part->reloc_cnt);
     
     for (i = 0; i < part->reloc_cnt; i++) {
@@ -429,7 +429,7 @@ static unsigned char *write_relocs_for_section (unsigned char *pos, struct secti
                 symbol = symbol_find (symbol->name);
             }
             
-            integer_to_array (part->rva - part->section->rva + part->reloc_arr[i].offset, rel.r_address, 4);
+            integer_to_array (part->rva - part->section->rva + part->reloc_arr[i].offset, rel.r_address, 4, 0);
             
             if (!symbol->part || strcmp (symbol->part->section->name, ".text") == 0) {
                 r_symbolnum = N_TEXT;
@@ -445,7 +445,7 @@ static unsigned char *write_relocs_for_section (unsigned char *pos, struct secti
                 r_symbolnum |= (1LU << 27);
             }
             
-            integer_to_array (r_symbolnum | (size_log2 << 25), rel.r_symbolnum, 4);
+            integer_to_array (r_symbolnum | (size_log2 << 25), rel.r_symbolnum, 4, 0);
             
             memcpy (pos, &rel, sizeof (rel));
             pos += sizeof (rel);
@@ -482,7 +482,7 @@ void elks_write (const char *filename) {
     data_section = section_find (".data");
     bss_section  = section_find (".bss");
     
-    integer_to_array (ELKS_MAGIC, exec.a_magic, 4);
+    integer_to_array (ELKS_MAGIC, exec.a_magic, 4, 0);
     
     exec.a_flags = 0x10;
     exec.a_cpu = (state->format == LD_FORMAT_I386_ELKS) ? 0x10 : 0x04;
@@ -518,26 +518,26 @@ void elks_write (const char *filename) {
     
     }
     
-    integer_to_array (text_size, exec.a_text, 4);
-    integer_to_array (data_size, exec.a_data, 4);
+    integer_to_array (text_size, exec.a_text, 4, 0);
+    integer_to_array (data_size, exec.a_data, 4, 0);
     
-    integer_to_array (bss_size, exec.a_bss, 4);
-    integer_to_array (state->entry_point, exec.a_entry, 4);
+    integer_to_array (bss_size, exec.a_bss, 4, 0);
+    integer_to_array (state->entry_point, exec.a_entry, 4, 0);
     
-    integer_to_array (array_to_integer (exec.a_text, 4) + array_to_integer (exec.a_data, 4), exec.a_total, 4);
+    integer_to_array (array_to_integer (exec.a_text, 4, 0) + array_to_integer (exec.a_data, 4, 0), exec.a_total, 4, 0);
     
     if (text_section) {
-        integer_to_array (section_get_num_relocs (text_section) * sizeof (struct elks_relocation_info), exec.a_trsize, 4);
+        integer_to_array (section_get_num_relocs (text_section) * sizeof (struct elks_relocation_info), exec.a_trsize, 4, 0);
     }
     
     if (data_section) {
-        integer_to_array (section_get_num_relocs (data_section) * sizeof (struct elks_relocation_info), exec.a_drsize, 4);
+        integer_to_array (section_get_num_relocs (data_section) * sizeof (struct elks_relocation_info), exec.a_drsize, 4, 0);
     }
     
     image_size = sizeof (exec);
     
-    image_size += (array_to_integer (exec.a_text, 4) + array_to_integer (exec.a_data, 4));
-    image_size += (array_to_integer (exec.a_trsize, 4) + array_to_integer (exec.a_drsize, 4));
+    image_size += (array_to_integer (exec.a_text, 4, 0) + array_to_integer (exec.a_data, 4, 0));
+    image_size += (array_to_integer (exec.a_trsize, 4, 0) + array_to_integer (exec.a_drsize, 4, 0));
     
     image_size += 4;
     
@@ -551,13 +551,13 @@ void elks_write (const char *filename) {
         section_write (text_section, pos);
     }
     
-    pos += array_to_integer (exec.a_text, 4);
+    pos += array_to_integer (exec.a_text, 4, 0);
     
     if (data_section) {
         section_write (data_section, pos);
     }
     
-    pos += array_to_integer (exec.a_data, 4);
+    pos += array_to_integer (exec.a_data, 4, 0);
     
     if (text_section) {
         pos = write_relocs_for_section (pos, text_section);
@@ -567,7 +567,7 @@ void elks_write (const char *filename) {
         pos = write_relocs_for_section (pos, data_section);
     }
     
-    integer_to_array (4, pos, 4);
+    integer_to_array (4, pos, 4, 0);
     
     if (fwrite (data, image_size, 1, fp) != 1) {
         report_at (program_name, 0, REPORT_ERROR, "failed to write data to '%s'", filename);

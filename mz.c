@@ -169,10 +169,10 @@ static unsigned char *write_relocs_for_section (unsigned char *pos, struct secti
             
                 addr = part->rva + part->reloc_arr[i].offset;
                 
-                integer_to_array (addr % 65536, pos, 2);
+                integer_to_array (addr % 65536, pos, 2, 0);
                 pos += 2;
                 
-                integer_to_array (addr / 65536, pos, 2);
+                integer_to_array (addr / 65536, pos, 2, 0);
                 pos += 2;
             
             }
