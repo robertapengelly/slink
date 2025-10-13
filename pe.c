@@ -847,7 +847,7 @@ static unsigned long write_data (FILE *outfile, void *data, unsigned long data_s
 
     if (fwrite (data, data_size, 1, outfile) != 1) {
     
-        report_at (program_name, 0, REPORT_ERROR, "failed whist writing data to '%s'", output_implib_filename);
+        report_at (program_name, 0, REPORT_ERROR, "failed whilst writing data to '%s'", output_implib_filename);
         return 0;
     
     }
