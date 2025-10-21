@@ -291,6 +291,8 @@ static void read_input_file (const char *filename) {
     
     if (memcmp (data, "!<arch>\n", 8) == 0) {
         read_archive (filename, data);
+    } else if (data[0] == RECORD_TYPE_LIBRARY_HEADER) {
+        read_omf_library (filename, data);
     } else {
         read_object_file (filename, data, data_size);
     }
