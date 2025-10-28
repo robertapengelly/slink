@@ -19,6 +19,29 @@ enum {
     RELOC_TYPE_PC8,
     
     RELOC_TYPE_32_NO_BASE,
+    
+    RELOC_TYPE_64_ADD,
+    RELOC_TYPE_32_ADD,
+    RELOC_TYPE_24_ADD,
+    RELOC_TYPE_16_ADD,
+    RELOC_TYPE_8_ADD,
+    
+    RELOC_TYPE_64_SUB,
+    RELOC_TYPE_32_SUB,
+    RELOC_TYPE_24_SUB,
+    RELOC_TYPE_16_SUB,
+    RELOC_TYPE_8_SUB,
+    
+    RELOC_TYPE_AARCH64_ADR_PREL_PG_HI21,
+    RELOC_TYPE_AARCH64_ADD_ABS_LO12_NC,
+    RELOC_TYPE_AARCH64_LDST8_ABS_LO12_NC,
+    RELOC_TYPE_AARCH64_LDST16_ABS_LO12_NC,
+    RELOC_TYPE_AARCH64_LDST32_ABS_LO12_NC,
+    RELOC_TYPE_AARCH64_LDST64_ABS_LO12_NC,
+    RELOC_TYPE_AARCH64_LDST128_ABS_LO12_NC,
+    RELOC_TYPE_AARCH64_JUMP26,
+    RELOC_TYPE_AARCH64_CALL26,
+    
     RELOC_TYPE_END
 
 };
@@ -29,7 +52,11 @@ struct reloc_entry;
 
 struct reloc_howto {
 
-    int size, pc_rel, no_base, final_right_shift;
+    int size;
+    int pc_rel;
+    int no_base;
+    int final_right_shift;
+    
     void (*special_function) (struct section_part *part, struct reloc_entry *rel, struct symbol *symbol);
     
     const char *name;

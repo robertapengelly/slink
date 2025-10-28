@@ -84,7 +84,7 @@ void symbol_remove_from_hashtab (struct symbol *symbol) {
 
 }
 
-unsigned long symbol_get_value_with_base (const struct symbol *symbol) {
+uint64_t symbol_get_value_with_base (const struct symbol *symbol) {
 
     if (symbol->part) {
         return state->base_address + symbol->part->rva + symbol->value;
@@ -94,12 +94,33 @@ unsigned long symbol_get_value_with_base (const struct symbol *symbol) {
 
 }
 
-unsigned long symbol_get_value_no_base (const struct symbol *symbol) {
+uint64_t symbol_get_value_no_base (const struct symbol *symbol) {
 
     if (symbol->part) {
         return symbol->part->rva + symbol->value;
     }
     
     return (symbol->value - state->base_address);
+
+}
+
+void symbols_for_each_global (void (*symbol_callback) (struct symbol *)) {
+
+    struct hashtab_entry *entry;
+    int i;
+    
+    for (i = 0; i < symbol_hashtab.capacity; i++) {
+    
+        if (!(entry = &symbol_hashtab.entries[i])) {
+            continue;
+        }
+        
+        if (!entry->key || !entry->value) {
+            continue;
+        }
+        
+        symbol_callback (entry->value);
+    
+    }
 
 }

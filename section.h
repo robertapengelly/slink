@@ -5,6 +5,7 @@
 #define     _SECTION_H
 
 #include    "reloc.h"
+#include    "stdint.h"
 #include    "symbol.h"
 
 struct object_file {
@@ -29,7 +30,7 @@ struct section_part {
     struct reloc_entry *reloc_arr;
     unsigned long reloc_cnt;
     
-    unsigned long rva;
+    uint64_t rva;
     struct section_part *next;
 
 };
@@ -58,10 +59,10 @@ struct section {
     
     struct subsection *all_subsections;
     
-    unsigned long total_size;
+    uint64_t total_size;
     int is_bss;
     
-    unsigned long rva;
+    uint64_t rva;
     unsigned long section_alignment;
     
     int target_index;

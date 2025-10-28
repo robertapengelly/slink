@@ -11,6 +11,7 @@
 #include    "elks.h"
 #include    "ld.h"
 #include    "lib.h"
+#include    "macho.h"
 #include    "mz.h"
 #include    "omf.h"
 #include    "pe.h"
@@ -95,12 +96,19 @@ static int read_object_file (const char *filename, unsigned char *data, unsigned
     
     if (data[0] == 0 && data[1] == 0) {
     
-        if (data[2] == 0xff && data[3] == 0xff) {
+        if (data[2] == 0xFF && data[3] == 0xFF) {
         
             read_pe_import_library (filename, data);
             return 0;
         
         }
+    
+    }
+    
+    if (data[0] == 0xCF && data[1] == 0xFA && data[2] == 0xED && data[3] == 0xFE) {
+    
+        read_macho_object (filename, data, data_size);
+        return 0;
     
     }
     
@@ -140,32 +148,98 @@ static int read_archive_memeber (unsigned char *pos, const char *filename) {
     
     hdr = (struct ar_header *) pos;
     
-    temp = xstrndup (hdr->name, sizeof (hdr->name));
-    strip_trailing_spaces (temp);
+    name = xstrndup (hdr->name, sizeof (hdr->name));
+    strip_trailing_spaces (name);
     
-    if (temp) {
+    if (strncmp (name, "#1/", 3) == 0) {
     
-        unsigned long member_name_len = strlen (temp);
+        unsigned long name_size, hdr_size;
+        char *temp, *p;
         
-        if (member_name_len && temp[member_name_len - 1] == '/' && temp[0] != '/') {
-            temp[member_name_len - 1] = '\0';
+        name_size = strtoul (name + 3, &p, 10);
+        
+        if (*p) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "%s: invalid archive member longname '%s'", filename, name);
+            
+            free (name);
+            return -1;
+        
         }
+        
+        temp = xstrndup (hdr->size, sizeof (hdr->size));
+        strip_trailing_spaces (temp);
+        
+        hdr_size = strtoul (temp, NULL, 10);
+        free (temp);
+        
+        if (name_size > hdr_size) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "%s: invalid archive member longname size %lu", filename, name_size);
+            
+            free (name);
+            return -1;
+        
+        }
+        
+        temp = xstrndup (hdr->size, sizeof (hdr->size));
+        strip_trailing_spaces (temp);
+        
+        data_size = strtoul (temp, NULL, 10);
+        free (temp);
+        
+        hdr = (struct ar_header *) (pos += sizeof (*hdr));
+        free (name);
+        
+        temp = xstrndup (hdr->name, name_size);
+        
+        if (temp) {
+        
+            unsigned long member_name_len = strlen (temp);
+            
+            if (member_name_len && temp[member_name_len - 1] == '/' && temp[0] != '/') {
+                temp[member_name_len - 1] = '\0';
+            }
+        
+        }
+        
+        name = xmalloc (strlen (filename) + 1 + strlen (temp) + 1 + 1);
+        sprintf (name, "%s(%s)", filename, temp);
+        
+        free (temp);
+        
+        ret = read_object_file (name, pos + name_size, data_size);
+        free (name);
+    
+    } else {
+    
+        temp = name;
+        
+        if (temp) {
+        
+            unsigned long member_name_len = strlen (temp);
+            
+            if (member_name_len && temp[member_name_len - 1] == '/' && temp[0] != '/') {
+                temp[member_name_len - 1] = '\0';
+            }
+        
+        }
+        
+        name = xmalloc (strlen (filename) + 1 + strlen (temp) + 1 + 1);
+        sprintf (name, "%s(%s)", filename, temp);
+        
+        free (temp);
+        
+        temp = xstrndup (hdr->size, sizeof (hdr->size));
+        strip_trailing_spaces (temp);
+        
+        data_size = strtoul (temp, NULL, 10);
+        free (temp);
+        
+        ret = read_object_file (name, pos + sizeof (*hdr), data_size);
+        free (name);
     
     }
-    
-    name = xmalloc (strlen (filename) + 1 + strlen (temp) + 1 + 1);
-    sprintf (name, "%s(%s)", filename, temp);
-    
-    free (temp);
-    
-    temp = xstrndup (hdr->size, sizeof (hdr->size));
-    strip_trailing_spaces (temp);
-    
-    data_size = strtoul (temp, NULL, 10);
-    free (temp);
-    
-    ret = read_object_file (name, pos + sizeof (*hdr), data_size);
-    free (name);
     
     memcpy (pos, ALREADY_READ, sizeof (ALREADY_READ));
     return ret;
@@ -180,7 +254,7 @@ static void read_archive (const char *filename, unsigned char *data) {
     struct offset_name_table *offset_name_table;
     
     char *string_table_pos, *name;
-    unsigned long no_symbols, i;
+    unsigned long num_symbols, i;
     
     unsigned long start_header_object_offset = 0;
     unsigned long end_header_object_offset = 0;
@@ -188,7 +262,110 @@ static void read_archive (const char *filename, unsigned char *data) {
     name = xstrndup (hdr->name, sizeof (hdr->name));
     strip_trailing_spaces (name);
     
-    if (strcmp (name, "/") != 0) {
+    if (strcmp (name, "/") == 0) {
+    
+        pos += sizeof (*hdr);
+        
+        num_symbols = array_to_integer (pos, 4, 1);
+        pos += 4;
+        
+        offset_name_table = xmalloc (sizeof (*offset_name_table) * num_symbols);
+        string_table_pos = (char *) pos + (num_symbols * 4);
+        
+        for (i = 0; i < num_symbols; i++) {
+        
+            offset_name_table[i].offset = array_to_integer (pos, 4, 1);
+            pos += 4;
+            
+            offset_name_table[i].name = (char *) string_table_pos;
+            string_table_pos += strlen (offset_name_table[i].name) + 1;
+        
+        }
+        
+        free (name);
+    
+    } else if (strncmp (name, "#1/", 3) == 0) {
+    
+        unsigned long name_size, hdr_size;
+        char *temp, *p;
+        
+        name_size = strtoul (name + 3, &p, 10);
+        
+        if (*p) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "%s: invalid archive member longname '%s'", filename, name);
+            
+            free (name);
+            return;
+        
+        }
+        
+        temp = xstrndup (hdr->size, sizeof (hdr->size));
+        strip_trailing_spaces (temp);
+        
+        hdr_size = strtoul (temp, NULL, 10);
+        free (temp);
+        
+        if (name_size > hdr_size) {
+        
+            report_at (program_name, 0, REPORT_ERROR, "%s: invalid archive member longname size %lu", filename, name_size);
+            
+            free (name);
+            return;
+        
+        }
+        
+        hdr = (struct ar_header *) (pos += sizeof (*hdr));
+        free (name);
+        
+        name = xstrndup (hdr->name, name_size);
+        
+        if (strcmp (name, "__.SYMDEF SORTED") == 0) {
+        
+            unsigned long num_bytes, str_offset;
+            pos += name_size;
+            
+            num_bytes = array_to_integer (pos, 4, 0);
+            pos += 4;
+            
+            if (num_bytes % 8) {
+            
+                report_at (program_name, 0, REPORT_ERROR, "%s: __.SYMDEF SORTED first field value not divisible by 8", filename);
+                
+                free (name);
+                return;
+            
+            }
+            
+            num_symbols = num_bytes / 8;
+            
+            offset_name_table = xmalloc (sizeof (*offset_name_table) * num_symbols);
+            string_table_pos = (char *) pos + num_symbols * 8 + 4;
+            
+            for (i = 0; i < num_symbols; i++) {
+            
+                str_offset = array_to_integer (pos, 4, 0);
+                pos += 4;
+                
+                offset_name_table[i].offset = array_to_integer (pos, 4, 0);
+                pos += 4;
+                
+                offset_name_table[i].name = (char *) string_table_pos + str_offset;
+            
+            }
+            
+            free (name);
+        
+        } else {
+        
+            report_at (program_name, 0, REPORT_ERROR, "%s: unable to add symbols: archive has no index; run ranlib to add one", filename);
+            
+            free (name);
+            return;
+        
+        }
+    
+    } else  {
     
         report_at (program_name, 0, REPORT_ERROR, "%s: unable to add symbols: archive has no index; run ranlib to add one", filename);
         
@@ -197,28 +374,9 @@ static void read_archive (const char *filename, unsigned char *data) {
     
     }
     
-    free (name);
-    pos += sizeof (*hdr);
-    
-    no_symbols = array_to_integer (pos, 4, 1);
-    pos += 4;
-    
-    offset_name_table = xmalloc (sizeof (*offset_name_table) * no_symbols);
-    string_table_pos = (char *) pos + (no_symbols * 4);
-    
-    for (i = 0; i < no_symbols; i++) {
-    
-        offset_name_table[i].offset = array_to_integer (pos, 4, 1);
-        offset_name_table[i].name = (char *) string_table_pos;
-        
-        string_table_pos += strlen (offset_name_table[i].name) + 1;
-        pos += 4;
-    
-    }
-    
     if (state->format == LD_FORMAT_I386_PE) {
     
-        for (i = 0; i < no_symbols && (!start_header_object_offset || !end_header_object_offset); i++) {
+        for (i = 0; i < num_symbols && (!start_header_object_offset || !end_header_object_offset); i++) {
         
             char *symbol_name = offset_name_table[i].name;
             
@@ -241,7 +399,7 @@ static void read_archive (const char *filename, unsigned char *data) {
         struct symbol *symbol;
         int change = 0;
         
-        for (i = 0; i < no_symbols; i++) {
+        for (i = 0; i < num_symbols; i++) {
         
             if (!(symbol = symbol_find (offset_name_table[i].name)) || !symbol_is_undefined (symbol)) {
                 continue;
@@ -359,6 +517,8 @@ int main (int argc, char **argv) {
                 state->base_address = 0x00400000;
             }
         
+        } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
+            state->base_address = 0x100000000;
         }
     
     }
@@ -371,6 +531,8 @@ int main (int argc, char **argv) {
         elks_before_link ();
     } else if (state->format == LD_FORMAT_I386_PE) {
         pe_before_link ();
+    } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
+        macho_before_link ();
     }
     
     link ();
@@ -438,6 +600,8 @@ int main (int argc, char **argv) {
         coff_after_link ();
         coff_write (state->output_filename);
     
+    } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
+        macho_write (state->output_filename);
     }
     
     if (state->output_map_filename) {

@@ -8,11 +8,273 @@
 
 #include    "ld.h"
 #include    "lib.h"
+#include    "macho.h"
 #include    "pe.h"
 #include    "reloc.h"
 #include    "report.h"
 #include    "section.h"
+#include    "stdint.h"
 #include    "symbol.h"
+
+static uint64_t generic_read (struct section_part *part, struct reloc_entry *rel) {
+
+    uint64_t result;
+    int endianess = 0;
+    
+    switch (rel->howto->size) {
+    
+        case 8:
+        
+            result = array_to_integer (part->content + rel->offset, 8, endianess);
+            break;
+        
+        case 4:
+        
+            result = array_to_integer (part->content + rel->offset, 4, endianess);
+            break;
+        
+        case 3:
+        
+            result = array_to_integer (part->content + rel->offset, 3, endianess);
+            break;
+        
+        case 2:
+        
+            result = array_to_integer (part->content + rel->offset, 2, endianess);
+            break;
+        
+        case 1:
+        
+            result = array_to_integer (part->content + rel->offset, 1, endianess);
+            break;
+        
+        default:
+        
+            report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "invalid relocation size");
+            exit (EXIT_FAILURE);
+    
+    }
+    
+    return result;
+
+}
+
+static void generic_write (struct section_part *part, struct reloc_entry *rel, uint64_t result) {
+
+    int endianess = 0;
+    
+    switch (rel->howto->size) {
+    
+        case 8:
+        
+            integer_to_array (result, part->content + rel->offset, 8, endianess);
+            break;
+        
+        case 4:
+        
+            integer_to_array (result, part->content + rel->offset, 4, endianess);
+            break;
+        
+        case 3:
+        
+            integer_to_array (result, part->content + rel->offset, 3, endianess);
+            break;
+        
+        case 2:
+        
+            integer_to_array (result, part->content + rel->offset, 2, endianess);
+            break;
+        
+        case 1:
+        
+            integer_to_array (result, part->content + rel->offset, 1, endianess);
+            break;
+        
+        default:
+        
+            report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "invalid relocation size");
+            exit (EXIT_FAILURE);
+    
+    }
+
+}
+
+static void reloc_generic_add (struct section_part *part, struct reloc_entry *rel, struct symbol *symbol) {
+
+    uint64_t result, saved;
+    
+    saved = generic_read (part, rel);
+    result = rel->addend;
+    
+    if (rel->howto->pc_rel || rel->howto->no_base) {
+        result += symbol_get_value_no_base (symbol);
+    } else {
+        result += symbol_get_value_with_base (symbol);
+    }
+    
+    if (rel->howto->pc_rel) {
+    
+        result -= part->rva + rel->offset;
+        result -= rel->howto->size;
+    
+    }
+    
+    if (rel->howto->size < (int) sizeof (result)) {
+    
+        uint64_t mask = (((uint64_t) 1) << (CHAR_BIT * rel->howto->size)) - 1;
+        result &= mask;
+    
+    }
+    
+    if (rel->howto->final_right_shift) {
+    
+        /* If the result was negative, it should remain negative even after the final right shift. */
+        uint64_t sign_bit = result & (((uint64_t) 1) << (rel->howto->size * 8 - 1));
+        
+        result >>= rel->howto->final_right_shift;
+        result |= sign_bit;
+    
+    }
+    
+    generic_write (part, rel, saved + result);
+
+}
+
+static void reloc_generic_subtract (struct section_part *part, struct reloc_entry *rel, struct symbol *symbol) {
+
+    uint64_t result, saved;
+    
+    saved = generic_read (part, rel);
+    result = rel->addend;
+    
+    if (rel->howto->pc_rel || rel->howto->no_base) {
+        result += symbol_get_value_no_base (symbol);
+    } else {
+        result += symbol_get_value_with_base (symbol);
+    }
+    
+    if (rel->howto->pc_rel) {
+    
+        result -= part->rva + rel->offset;
+        result -= rel->howto->size;
+    
+    }
+    
+    if (rel->howto->size < (int) sizeof (result)) {
+    
+        uint64_t mask = (((uint64_t) 1) << (CHAR_BIT * rel->howto->size)) - 1;
+        result &= mask;
+    
+    }
+    
+    if (rel->howto->final_right_shift) {
+    
+        /* If the result was negative, it should remain negative even after the final right shift. */
+        uint64_t sign_bit = result & (((uint64_t) 1) << (rel->howto->size * 8 - 1));
+        
+        result >>= rel->howto->final_right_shift;
+        result |= sign_bit;
+    
+    }
+    
+    generic_write (part, rel, saved - result);
+
+}
+
+static void reloc_aarch64_hi21_page_pcrel (struct section_part *part, struct reloc_entry *rel, struct symbol *symbol) {
+
+    uint64_t bottom_2_bits = 0, result;
+    unsigned long field;
+    
+    result = (symbol_get_value_with_base (symbol) + rel->addend) & ~(uint64_t) 0xfff;
+    result -= (state->base_address + part->rva + rel->offset) & ~(uint64_t) 0xfff;
+    
+    if ((bottom_2_bits = result & 0x3000)) {
+    
+        result &= ~bottom_2_bits;
+        bottom_2_bits >>= 12;
+    
+    }
+    
+    result >>= 9;
+    
+    /**
+     * If the result is negative, those 2 bits are already set,
+     * so they must be cleared before putting the real bottom 2 bits there.
+     */
+    result &= ~(((uint64_t) 0x03) << 29);
+    result |= bottom_2_bits << 29;
+    
+    field = array_to_integer (part->content + rel->offset, 4, 0);
+    field = ((field & ~(uint64_t) rel->howto->dst_mask) | (((field & rel->howto->dst_mask) + result) & rel->howto->dst_mask));
+    
+    integer_to_array (field, part->content + rel->offset, 4, 0);
+
+}
+
+static void reloc_aarch64_generic (struct section_part *part, struct reloc_entry *rel, struct symbol *symbol) {
+
+    uint64_t result = rel->addend, field;
+    result += symbol_get_value_with_base (symbol);
+    
+    if (rel->howto->pc_rel) {
+        result -= state->base_address + part->rva + rel->offset;
+    }
+    
+    result >>= rel->howto->final_right_shift;
+    result <<= rel->howto->final_left_shift;
+    
+    switch (rel->howto->size) {
+    
+        case 8:
+        
+            field = array_to_integer (part->content + rel->offset, 8, 0);
+            break;
+        
+        case 4:
+        
+            field = array_to_integer (part->content + rel->offset, 4, 0);
+            break;
+        
+        case 2:
+        
+            field = array_to_integer (part->content + rel->offset, 2, 0);
+            break;
+        
+        default:
+        
+            report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "invalid relocation size");
+            exit (EXIT_FAILURE);
+    
+    }
+
+    field = ((field & ~(uint64_t) rel->howto->dst_mask) | (((field & rel->howto->dst_mask) + result) & rel->howto->dst_mask));
+    
+    switch (rel->howto->size) {
+    
+        case 8:
+        
+            integer_to_array (field, part->content + rel->offset, 8, 0);
+            break;
+        
+        case 4:
+        
+            integer_to_array (field, part->content + rel->offset, 4, 0);
+            break;
+        
+        case 2:
+        
+            integer_to_array (field, part->content + rel->offset, 2, 0);
+            break;
+        
+        default:
+        
+            report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "invalid relocation size");
+            exit (EXIT_FAILURE);
+    
+    }
+
+}
 
 struct reloc_howto reloc_howtos[RELOC_TYPE_END] = {
 
@@ -28,7 +290,29 @@ struct reloc_howto reloc_howtos[RELOC_TYPE_END] = {
     {   2,  1,  0,  0,  0,  "RELOC_TYPE_PC16",          0,  0   },
     {   1,  1,  0,  0,  0,  "RELOC_TYPE_PC8",           0,  0   },
     
-    {   4,  0,  1,  0,  0,  "RELOC_TYPE_32_NO_BASE",    0,  0   }
+    {   4,  0,  1,  0,  0,  "RELOC_TYPE_32_NO_BASE",    0,  0   },
+    
+    {   8,  0,  0,  0,  &reloc_generic_add,     "RELOC_TYPE_64_ADD",    0,  0   },
+    {   4,  0,  0,  0,  &reloc_generic_add,     "RELOC_TYPE_32_ADD",    0,  0   },
+    {   3,  0,  0,  0,  &reloc_generic_add,     "RELOC_TYPE_24_ADD",    0,  0   },
+    {   2,  0,  0,  0,  &reloc_generic_add,     "RELOC_TYPE_16_ADD",    0,  0   },
+    {   1,  0,  0,  0,  &reloc_generic_add,     "RELOC_TYPE_8_ADD",     0,  0   },
+
+    {   8,  0,  0,  0,  &reloc_generic_subtract,    "RELOC_TYPE_64_SUB",    0,  0   },
+    {   4,  0,  0,  0,  &reloc_generic_subtract,    "RELOC_TYPE_32_SUB",    0,  0   },
+    {   3,  0,  0,  0,  &reloc_generic_subtract,    "RELOC_TYPE_24_SUB",    0,  0   },
+    {   2,  0,  0,  0,  &reloc_generic_subtract,    "RELOC_TYPE_16_SUB",    0,  0   },
+    {   1,  0,  0,  0,  &reloc_generic_subtract,    "RELOC_TYPE_8_SUB",     0,  0   },
+    
+    {   4,  1,  0,  9,  &reloc_aarch64_hi21_page_pcrel,     "RELOC_TYPE_AARCH64_ADR_PREL_PG_HI21",      0x60ffffe0,     0   },
+    {   4,  0,  0,  0,  &reloc_aarch64_generic,             "RELOC_TYPE_AARCH64_ADD_ABS_LO12_NC",       0x3ffc00,       10  },
+    {   4,  0,  0,  0,  &reloc_aarch64_generic,             "RELOC_TYPE_AARCH64_LDST8_ABS_LO12_NC",     0x3ffc00,       10  },
+    {   4,  0,  0,  1,  &reloc_aarch64_generic,             "RELOC_TYPE_AARCH64_LDST16_ABS_LO12_NC",    0x1ffc00,       10  },
+    {   4,  0,  0,  2,  &reloc_aarch64_generic,             "RELOC_TYPE_AARCH64_LDST32_ABS_LO12_NC",    0xffc00,        10  },
+    {   4,  0,  0,  3,  &reloc_aarch64_generic,             "RELOC_TYPE_AARCH64_LDST64_ABS_LO12_NC",    0x7fc00,        10  },
+    {   4,  0,  0,  4,  &reloc_aarch64_generic,             "RELOC_TYPE_AARCH64_LDST128_ABS_LO12_NC",   0x3fc00,        10  },
+    {   4,  1,  0,  2,  &reloc_aarch64_generic,             "RELOC_TYPE_AARCH64_JUMP26",                0x3ffffff,      0   },
+    {   4,  1,  0,  2,  &reloc_aarch64_generic,             "RELOC_TYPE_AARCH64_CALL26",                0x3ffffff,      0   }
 
 };
 
@@ -252,10 +536,12 @@ static void calculate_section_sizes_and_rvas (void) {
     struct section *section;
     struct section_part *part;
     
-    unsigned long rva = 0;
+    uint64_t rva = 0;
     
     if (state->format == LD_FORMAT_I386_PE) {
         rva = pe_get_first_section_rva ();
+    } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
+        rva = macho_get_first_section_rva ();
     }
     
     for (section = all_sections; section; section = section->next) {
@@ -269,7 +555,7 @@ static void calculate_section_sizes_and_rvas (void) {
         
             if (part->next && part->next->alignment > 1) {
             
-                unsigned long new_rva = ALIGN (rva + part->content_size, part->next->alignment);
+                uint64_t new_rva = ALIGN (rva + part->content_size, part->next->alignment);
                 
                 if (new_rva != rva + part->content_size) {
                 
@@ -296,7 +582,7 @@ static void calculate_section_sizes_and_rvas (void) {
 static void reloc_generic (struct section_part *part, struct reloc_entry *rel, struct symbol *symbol) {
 
     unsigned char opcode = (part->content + rel->offset - 1)[0];
-    unsigned long result = 0, size = rel->howto->size, offset = rel->offset;
+    uint64_t result = 0, size = rel->howto->size, offset = rel->offset;
     
     switch (size) {
     
@@ -413,14 +699,19 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
     
     if ((unsigned long) size < sizeof (result)) {
     
-        unsigned long mask = (((unsigned long) 1) << (CHAR_BIT * size)) - 1;
+        unsigned long mask = (((uint64_t) 1) << (CHAR_BIT * size)) - 1;
         result &= mask;
     
     }
     
-    result >>= rel->howto->final_right_shift;
+    if (rel->howto->final_right_shift) {
     
-    /*printf ("%lx\n", n_type);*/
+        uint64_t sign_bit = result & (((uint64_t) 1) << (rel->howto->size * 8 - 1));
+        result >>= rel->howto->final_right_shift;
+        
+        result |= sign_bit;
+    
+    }
     
     if (state->emulation == LD_EMULATION_IA16_ELKS || state->emulation == LD_EMULATION_IA16_MZ) {
     
@@ -666,7 +957,7 @@ static void calculate_entry_point (void) {
     
     if (!state->entry_symbol_name) {
     
-        if (state->format == LD_FORMAT_I386_AOUT || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS) {
+        if (state->format == LD_FORMAT_I386_AOUT || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
         
             state->entry_symbol_name = xstrdup ("_start");
             

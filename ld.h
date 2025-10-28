@@ -51,6 +51,9 @@ struct ld_state {
 
 #define     LD_FORMAT_I386_PE           0x07
 
+#define     LD_FORMAT_AMD64_MACHO       0x08
+#define     LD_FORMAT_AARCH64_MACHO     0x09
+
 
 extern struct ld_state *state;
 extern const char *program_name;

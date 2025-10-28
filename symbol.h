@@ -5,14 +5,15 @@
 #define     _SYMBOL_H
 
 #include    "section.h"
+#include    "stdint.h"
 
 struct symbol {
 
     char *name;
     int flags, n_type;
     
-    unsigned long value;
-    unsigned long size;
+    uint64_t value;
+    uint64_t size;
     
     long section_number;                /* 1-based, 0 means undefined, negative numbers have special meaning. */
     int auxiliary;                      /* such symbol should be ignored and is only a filter. */
@@ -32,7 +33,9 @@ int symbol_is_undefined (const struct symbol *symbol);
 void symbol_add_to_hashtab (struct symbol *symbol);
 void symbol_remove_from_hashtab (struct symbol *symbol);
 
-unsigned long symbol_get_value_with_base (const struct symbol *symbol);
-unsigned long symbol_get_value_no_base (const struct symbol *symbol);
+uint64_t symbol_get_value_with_base (const struct symbol *symbol);
+uint64_t symbol_get_value_no_base (const struct symbol *symbol);
+
+void symbols_for_each_global (void (*symbol_callback) (struct symbol *));
 
 #endif      /* _SYMBOL_H */

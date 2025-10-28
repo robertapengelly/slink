@@ -9,7 +9,7 @@ COPTS=-oneatx -ecc -zp1 -q -w -c -ml -zl -D__MSDOS__ -D__PDOS__ -fpi87 -s -zdp -
 all: clean slink.exe
 
 slink.exe: aout.obj coff.obj elks.obj hashtab.obj ld.obj \
-     lib.obj link.obj map.obj mz.obj omf.obj pe.obj report.obj \
+     lib.obj link.obj macho.obj map.obj mz.obj omf.obj pe.obj report.obj \
      section.obj symbol.obj vector.obj write7x.obj
   wlink File ..\pdos\pdpclib\dosstart.obj,ld.obj Name slink.exe Form dos Library temp.lib,..\pdos\pdpclib\watcom.lib Option quiet,nod,stack=8192,start=___asmstart,map,verbose,dosseg
 

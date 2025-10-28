@@ -1,10 +1,13 @@
 /******************************************************************************
  * @file            map.c
  *****************************************************************************/
+#include    "stdint.h"
+
 #include    <stdio.h>
 #include    <stdlib.h>
 #include    <string.h>
 
+#include    "inttypes.h"
 #include    "ld.h"
 #include    "report.h"
 #include    "section.h"
@@ -75,7 +78,7 @@ void map_write (const char *filename) {
             fprintf (fp, "\n%-16s", "");
         }
         
-        fprintf (fp, "0x%08lx  %12lu\n\n", state->base_address + section->rva, section->total_size);
+        fprintf (fp, "0x%08"PRIx64"  %12"PRIu64"\n\n", state->base_address + section->rva, section->total_size);
         
         for (part = section->first_part; part; part = part->next) {
         
@@ -83,7 +86,7 @@ void map_write (const char *filename) {
                 fprintf (fp, "\n%-16s", "");
             }
             
-            fprintf (fp, "0x%08lx  %12lu %s\n", state->base_address + part->rva, part->content_size, part->of->filename);
+            fprintf (fp, "0x%08"PRIx64"  %12"PRIu64" %s\n", state->base_address + part->rva, part->content_size, part->of->filename);
             
             for (symbol = part->of->symbol_arr; symbol < part->of->symbol_arr + part->of->symbol_cnt; symbol++) {
             
@@ -95,7 +98,7 @@ void map_write (const char *filename) {
                     continue;
                 }
                 
-                fprintf (fp, "%-16s %12lu %10s %s\n", "", symbol_get_value_with_base (symbol), "", symbol->name);
+                fprintf (fp, "%-16s %12"PRIu64" %10s %s\n", "", symbol_get_value_with_base (symbol), "", symbol->name);
             
             }
         
@@ -115,7 +118,7 @@ void map_write (const char *filename) {
             last_section = section;
         }
         
-        fprintf (fp, "Sizeof Module: %lu bytes\n", last_section ? (last_section->rva + last_section->total_size) : 0);
+        fprintf (fp, "Sizeof Module: %"PRIu64" bytes\n", last_section ? (last_section->rva + last_section->total_size) : 0);
     
     }
     

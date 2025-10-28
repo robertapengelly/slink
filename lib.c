@@ -13,6 +13,7 @@
 #include    "mz.h"
 #include    "pe.h"
 #include    "report.h"
+#include    "stdint.h"
 
 struct options_with_use {
 
@@ -301,6 +302,30 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
             }
             
+            if (xstrcasecmp (optarg, "macho-amd64") == 0) {
+            
+                state->format = LD_FORMAT_AMD64_MACHO;
+                
+                /*if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_AND64_MACHO;
+                }*/
+                
+                break;
+            
+            }
+            
+            if (xstrcasecmp (optarg, "macho-aarch64") == 0) {
+            
+                state->format = LD_FORMAT_AARCH64_MACHO;
+                
+                /*if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_AND64_MACHO;
+                }*/
+                
+                break;
+            
+            }
+            
             report_at (program_name, 0, REPORT_ERROR, "unrecognised output format '%s'", optarg);
             exit (EXIT_FAILURE);
         
@@ -388,23 +413,27 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
 
 }
 
-unsigned long array_to_integer (unsigned char *arr, int size, int big_endian) {
+uint64_t array_to_integer (unsigned char *arr, int size, int big_endian) {
 
-    unsigned long value = 0;
+    uint64_t value = 0;
     int i;
+    
+#if     defined (NO_LONG_LONG) && ULONG_MAX <= 4294967295UL
+    if (size == 8) { size = 4; }
+#endif
     
     if (big_endian) {
     
         int j;
         
         for (i = size, j = 0; i > 0; i--, j++) {
-            value |= (unsigned long) arr[j] << (CHAR_BIT * (i - 1));
+            value |= (uint64_t) arr[j] << (CHAR_BIT * (i - 1));
         }
     
     } else {
     
         for (i = 0; i < size; i++) {
-            value |= (unsigned long) arr[i] << (CHAR_BIT * i);
+            value |= (uint64_t) arr[i] << (CHAR_BIT * i);
         }
     
     }
@@ -413,8 +442,12 @@ unsigned long array_to_integer (unsigned char *arr, int size, int big_endian) {
 
 }
 
-void integer_to_array (unsigned long value, unsigned char *dest, int size, int big_endian) {
+void integer_to_array (uint64_t value, unsigned char *dest, int size, int big_endian) {
 
+#if     defined (NO_LONG_LONG) && ULONG_MAX <= 4294967295UL
+    if (size == 8) { size = 4; }
+#endif
+    
     if (big_endian) {
     
         int i, j;
