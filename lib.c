@@ -109,8 +109,9 @@ static void print_usage (void) {
         fprintf (stderr, "    --help                            Print option help.\n");
         fprintf (stderr, "    --oformat FORMAT                  Specify the format of output file (default msdos).\n");
         fprintf (stderr, "                                          Supported formats are:\n");
-        fprintf (stderr, "                                              a.out-i386, elks-ia16, elks-i386, pe-i386\n");
-        fprintf (stderr, "                                              binary, msdos\n");
+        fprintf (stderr, "                                              a.out-i386, elks-ia16, elks-i386\n");
+        fprintf (stderr, "                                              macho-aarch64, macho-amd64\n");
+        fprintf (stderr, "                                              pe-i386, binary, msdos\n");
         fprintf (stderr, "    --image-base <address>            Set base address of the executable.\n");
         
         fprintf (stderr, "\n");
