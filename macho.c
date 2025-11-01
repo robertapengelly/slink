@@ -12,6 +12,8 @@
 #include    "report.h"
 #include    "section.h"
 
+#define     PAGE_SIZE                   0x4000
+
 struct part_reloc {
 
     struct section_part *part;
@@ -583,6 +585,12 @@ void read_macho_object (const char *filename, unsigned char *data, unsigned long
                             
                             bss_part->content_size = symbol->size = symbol->value;
                             
+                            if (bss_part->content_size > PAGE_SIZE) {
+                                bss_part->alignment = PAGE_SIZE;
+                            } else {
+                                bss_part->alignment = bss_part->content_size;
+                            }
+                            
                             symbol->part = bss_part;
                             symbol->value = 0;
                             symbol->section_number = bss_section_number;
@@ -719,8 +727,6 @@ void read_macho_object (const char *filename, unsigned char *data, unsigned long
 
 #define     section_in_data_seg(section)                    \
     (!((section)->flags & SECTION_FLAG_CODE))
-
-#define     PAGE_SIZE                   0x4000
 
 static struct section *first_data_section;
 static uint64_t first_data_section_alignment;
@@ -1090,15 +1096,14 @@ void macho_write (const char *filename) {
     
         integer_to_array (MH_CPU_TYPE_AMD64, header.cpu_type, 4, 0);
         integer_to_array (MH_CPU_SUBTYPE_I386_ALL, header.cpu_subtype, 4, 0);
+        
+        integer_to_array (MH_NOUNDEFS, header.flags, 4, 0);
     
     } else if (state->format == LD_FORMAT_AARCH64_MACHO) {
-        integer_to_array (MH_CPU_TYPE_ARM64, header.cpu_type, 4, 0);
-    }
     
-    if (state->format == LD_FORMAT_AARCH64_MACHO) {
+        integer_to_array (MH_CPU_TYPE_ARM64, header.cpu_type, 4, 0);
         integer_to_array (MH_NOUNDEFS | MH_DYLDLINK | MH_TWOLEVEL | MH_PIE, header.flags, 4, 0);
-    } else {
-        integer_to_array (MH_NOUNDEFS, header.flags, 4, 0);
+    
     }
     
     sizeof_commands += sizeof (segment_cmd);
