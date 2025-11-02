@@ -122,7 +122,7 @@ void map_write (const char *filename) {
     
     }
     
-    fprintf (fp, "Entry Point: 0x%08lx\n", state->base_address + state->entry_point);
+    fprintf (fp, "Entry Point: 0x%08"PRIx64"\n", state->base_address + state->entry_point);
     
     if (strcmp (filename, "") != 0) {
         fclose (fp);

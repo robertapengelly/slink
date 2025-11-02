@@ -25,7 +25,7 @@ struct section_part {
     struct object_file *of;
     
     unsigned char *content;
-    unsigned long content_size, alignment;
+    uint64_t content_size, alignment;
     
     struct reloc_entry *reloc_arr;
     unsigned long reloc_cnt;
