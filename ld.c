@@ -8,6 +8,7 @@
 #include    "aout.h"
 #include    "ar.h"
 #include    "coff.h"
+#include    "elf.h"
 #include    "elks.h"
 #include    "ld.h"
 #include    "lib.h"
@@ -108,6 +109,21 @@ static int read_object_file (const char *filename, unsigned char *data, unsigned
     if (data[0] == 0xCF && data[1] == 0xFA && data[2] == 0xED && data[3] == 0xFE) {
     
         read_macho_object (filename, data, data_size);
+        return 0;
+    
+    }
+    
+    if (data[0] == 0x7F && memcmp (data + 1, "ELF", 3) == 0) {
+    
+        int endianess = (data[EI_DATA] == ELF_DATA2MSB);
+        
+        if (data[EI_CLASS] == ELF_CLASS64) {
+            /*elf64_get_symbols (object, offset + 8, endianess);*/
+            report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "currently 64-bit elf support isn't implemented");
+        } else {
+            read_elf32_object (filename, data, data_size, endianess);
+        }
+        
         return 0;
     
     }
@@ -519,6 +535,8 @@ int main (int argc, char **argv) {
         
         } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
             state->base_address = 0x100000000;
+        } else if (state->format == LD_FORMAT_AMD64_ELF || state->format == LD_FORMAT_I386_ELF) {
+            state->base_address = 0x00400000;
         }
     
     }
@@ -533,6 +551,8 @@ int main (int argc, char **argv) {
         pe_before_link ();
     } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
         macho_before_link ();
+    } else if (state->format == LD_FORMAT_AMD64_ELF || state->format == LD_FORMAT_I386_ELF) {
+        elf_before_link ();
     }
     
     link ();
@@ -590,6 +610,8 @@ int main (int argc, char **argv) {
         aout_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS) {
         elks_write (state->output_filename);
+    } else if (state->format == LD_FORMAT_I386_ELF) {
+        elf32_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_PE) {
     
         pe_after_link ();

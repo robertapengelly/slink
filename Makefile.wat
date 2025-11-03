@@ -4,7 +4,7 @@
 SRCDIR              ?=  $(CURDIR)
 VPATH               :=  $(SRCDIR)
 
-SRC                 :=  aout.c coff.c elks.c hashtab.c ld.c lib.c link.c macho.c map.c mz.c omf.c pe.c report.c section.c symbol.c vector.c write7x.c
+SRC                 :=  aout.c coff.c elf.c elks.c hashtab.c ld.c lib.c link.c macho.c map.c mz.c omf.c pe.c report.c section.c symbol.c vector.c write7x.c
 
 all: slink.exe
 

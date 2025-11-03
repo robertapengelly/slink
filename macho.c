@@ -80,7 +80,7 @@ static void translate_relocation (struct reloc_entry *reloc, struct macho_reloca
     pcrel = (r_symbolnum >> 24) & 1;
     type = r_symbolnum >> 28;
     
-    if (state->format == LD_FORMAT_AMD64_MACHO) {
+    if ((state->format & LD_TARGET_MACHINE_AMD64)) {
     
         switch (size) {
         
@@ -189,12 +189,8 @@ static void translate_relocation (struct reloc_entry *reloc, struct macho_reloca
                 goto unsupported;
         
         }
-        
-        return;
     
-    }
-    
-    if (state->format == LD_FORMAT_AARCH64_MACHO) {
+    } else if ((state->format & LD_TARGET_MACHINE_AARCH64)) {
     
         switch (size) {
         
@@ -277,15 +273,14 @@ static void translate_relocation (struct reloc_entry *reloc, struct macho_reloca
                 goto unsupported;
         
         }
-        
-        return;
+    
+    } else {
+    unsupported:
+    
+        report_at (program_name, 0, REPORT_WARNING, "%s: ignoring not yet supported relocation with size %u, pcrel %u and type %#x", part->of->filename, size, pcrel, type);
+        reloc->howto = &reloc_howtos[RELOC_TYPE_IGNORED];
     
     }
-    
-unsupported:
-    
-    report_at (program_name, 0, REPORT_WARNING, "%s: ignoring not yet supported relocation with size %u, pcrel %u and type %#x", part->of->filename, size, pcrel, type);
-    reloc->howto = &reloc_howtos[RELOC_TYPE_IGNORED];
 
 }
 
@@ -294,7 +289,6 @@ unsupported:
 void read_macho_object (const char *filename, unsigned char *data, unsigned long data_size) {
 
     unsigned char *pos = (unsigned char *) data;
-    struct macho_header_64 *header;
     
     struct section_part **part_p_array = 0, *bss_part;
     struct object_file *of = 0;
@@ -324,6 +318,7 @@ void read_macho_object (const char *filename, unsigned char *data, unsigned long
     struct macho_relocation_info *reloc_info;
     unsigned char *rel_pos;
     
+    struct macho_header_64 *header;
     CHECK_READ (pos, sizeof (*header));
     
     header = (struct macho_header_64 *) pos;
@@ -534,8 +529,8 @@ void read_macho_object (const char *filename, unsigned char *data, unsigned long
             
             for (j = 0; j < num_syms; j++) {
             
-                symbol = of->symbol_arr + j;
                 nlist_64 = (struct nlist_64 *) (sym_pos + j * sizeof (*nlist_64));
+                symbol = of->symbol_arr + j;
                 
                 if ((n_strx = array_to_integer (nlist_64->n_strx, 4, 0)) < array_to_integer (symtab_cmd->string_size, 4, 0)) {
                 
@@ -1038,8 +1033,8 @@ static int log_base2 (uint64_t val) {
 void macho_write (const char *filename) {
 
     struct chained_fixup_starts chained_fixups[NUM_SEGS] = { { 0 } };
-    struct macho_header_64 header = { 0 };
     
+    struct macho_header_64 header = { 0 };
     FILE *fp;
     
     unsigned long data_size = 0, content_offset = 0, sizeof_commands = 0, num_commands = 0, file_offset = 0;

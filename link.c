@@ -6,6 +6,7 @@
 #include    <stdlib.h>
 #include    <string.h>
 
+#include    "elf.h"
 #include    "ld.h"
 #include    "lib.h"
 #include    "macho.h"
@@ -542,6 +543,8 @@ static void calculate_section_sizes_and_rvas (void) {
         rva = pe_get_first_section_rva ();
     } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
         rva = macho_get_first_section_rva ();
+    } else if (state->format == LD_FORMAT_AMD64_ELF || state->format == LD_FORMAT_I386_ELF) {
+        rva = elf_get_first_section_rva ();
     }
     
     for (section = all_sections; section; section = section->next) {
