@@ -51,7 +51,7 @@ static void translate_relocation (const char *filename, struct reloc_entry *relo
         
             case R_386_NONE:
             
-                break;
+                goto bad;
             
             case R_386_32:
             
@@ -118,7 +118,7 @@ static void translate_relocation64_addend (const char *filename, struct reloc_en
         
             case R_AMD64_NONE:
             
-                break;
+                goto bad;
             
             case R_AMD64_64:
             
@@ -1422,7 +1422,7 @@ void elf32_write (const char *filename) {
     
     struct section *section;
     uint16_t e_phnum = 0, e_shnum = 1;
-    
+
     uint64_t shstrtab_size, shstrtab_start_i = 0;
     
     if (!(fp = fopen (filename, "wb"))) {
