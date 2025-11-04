@@ -118,8 +118,7 @@ static int read_object_file (const char *filename, unsigned char *data, unsigned
         int endianess = (data[EI_DATA] == ELF_DATA2MSB);
         
         if (data[EI_CLASS] == ELF_CLASS64) {
-            /*elf64_get_symbols (object, offset + 8, endianess);*/
-            report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "currently 64-bit elf support isn't implemented");
+            read_elf64_object (filename, data, data_size, endianess);
         } else {
             read_elf32_object (filename, data, data_size, endianess);
         }
@@ -612,6 +611,8 @@ int main (int argc, char **argv) {
         elks_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_ELF) {
         elf32_write (state->output_filename);
+    } else if (state->format == LD_FORMAT_AMD64_ELF) {
+        elf64_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_PE) {
     
         pe_after_link ();

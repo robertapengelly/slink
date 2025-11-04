@@ -37,6 +37,25 @@ struct elf32_exec {
 
 };
 
+struct elf64_exec {
+
+    unsigned char e_ident[16];
+    unsigned char e_type[2];
+    unsigned char e_machine[2];
+    unsigned char e_version[4];
+    unsigned char e_entry[8];
+    unsigned char e_phoff[8];
+    unsigned char e_shoff[8];
+    unsigned char e_flags[4];
+    unsigned char e_ehsize[2];
+    unsigned char e_phentsize[2];
+    unsigned char e_phnum[2];
+    unsigned char e_shentsize[2];
+    unsigned char e_shnum[2];
+    unsigned char e_shstrndx[2];
+
+};
+
 #define     SHT_NULL                    0
 #define     SHT_PROGBITS                1
 #define     SHT_SYMTAB                  2
@@ -58,6 +77,21 @@ struct elf32_shdr {
 
 };
 
+struct elf64_shdr {
+    
+    unsigned char sh_name[4];
+    unsigned char sh_type[4];
+    unsigned char sh_flags[8];
+    unsigned char sh_addr[8];
+    unsigned char sh_offset[8];
+    unsigned char sh_size[8];
+    unsigned char sh_link[4];
+    unsigned char sh_info[4];
+    unsigned char sh_addralign[8];
+    unsigned char sh_entsize[8];
+
+};
+
 #define     SHF_WRITE                   0x01
 #define     SHF_ALLOC                   0x02
 #define     SHF_EXEC_INSTR              0x04
@@ -70,6 +104,17 @@ struct elf32_sym {
     unsigned char st_info[1];
     unsigned char st_other[1];
     unsigned char st_shndx[2];
+
+};
+
+struct elf64_sym {
+
+    unsigned char st_name[4];
+    unsigned char st_info[1];
+    unsigned char st_other[1];
+    unsigned char st_shndx[2];
+    unsigned char st_value[8];
+    unsigned char st_size[8];
 
 };
 
@@ -87,6 +132,14 @@ struct elf32_rela {
 
 };
 
+struct elf64_rela {
+
+    unsigned char r_offset[8];
+    unsigned char r_info[8];
+    unsigned char r_addend[8];
+
+};
+
 struct elf32_rel {
 
     unsigned char r_offset[4];
@@ -97,6 +150,21 @@ struct elf32_rel {
 #define     R_386_NONE                  0
 #define     R_386_32                    1
 #define     R_386_PC32                  2
+
+struct elf64_rel {
+
+    unsigned char r_offset[8];
+    unsigned char r_info[8];
+
+};
+
+#define     R_AMD64_NONE                0
+#define     R_AMD64_64                  1
+#define     R_AMD64_PC32                2
+#define     R_AMD64_PLT32               4
+#define     R_AMD64_RELATIVE            8
+#define     R_AMD64_32                  10
+#define     R_AMD64_32S                 11
 
 struct elf32_phdr {
 
@@ -111,10 +179,26 @@ struct elf32_phdr {
 
 };
 
-void read_elf32_object (const char *filename, unsigned char *data, unsigned long data_size, int endianess);
+struct elf64_phdr {
+
+    unsigned char p_type[4];
+    unsigned char p_flags[4];
+    unsigned char p_offset[8];
+    unsigned char p_vaddr[8];
+    unsigned char p_paddr[8];
+    unsigned char p_filesz[8];
+    unsigned char p_memsz[8];
+    unsigned char p_align[8];
+
+};
 
 void elf_before_link (void);
+
+void read_elf32_object (const char *filename, unsigned char *data, unsigned long data_size, int endianess);
+void read_elf64_object (const char *filename, unsigned char *data, unsigned long data_size, int endianess);
+
 void elf32_write (const char *filename);
+void elf64_write (const char *filename);
 
 #include    "stdint.h"
 uint64_t elf_get_first_section_rva (void);
