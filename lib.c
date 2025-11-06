@@ -109,7 +109,8 @@ static void print_usage (void) {
         fprintf (stderr, "    --help                            Print option help.\n");
         fprintf (stderr, "    --oformat FORMAT                  Specify the format of output file (default msdos).\n");
         fprintf (stderr, "                                          Supported formats are:\n");
-        fprintf (stderr, "                                              a.out-i386, elf-amd64, elf-i386\n");
+        fprintf (stderr, "                                              a.out-i386, elf-aarch64\n");
+        fprintf (stderr, "                                              elf-amd64, elf-i386\n");
         fprintf (stderr, "                                              elks-ia16, elks-i386\n");
         fprintf (stderr, "                                              macho-aarch64, macho-amd64\n");
         fprintf (stderr, "                                              pe-i386, binary, msdos\n");
@@ -343,6 +344,18 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             if (xstrcasecmp (optarg, "elf-amd64") == 0) {
             
                 state->format = LD_FORMAT_AMD64_ELF;
+                
+                /*if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_I386_COFF;
+                }*/
+                
+                break;
+            
+            }
+            
+            if (xstrcasecmp (optarg, "elf-aarch64") == 0) {
+            
+                state->format = LD_FORMAT_AARCH64_ELF;
                 
                 /*if (state->emulation == LD_EMULATION_NONE) {
                     state->emulation = LD_EMULATION_I386_COFF;

@@ -112,7 +112,93 @@ static void translate_relocation64_addend (const char *filename, struct reloc_en
     reloc->offset = r_offset;
     reloc->addend = array_to_integer (input_reloc->r_addend, 8, endianess);
     
-    if ((state->format & LD_TARGET_MACHINE_AMD64)) {
+    if ((state->format & LD_TARGET_MACHINE_AARCH64)) {
+    
+        switch (rel_type) {
+        
+            case R_AARCH64_NONE:
+            
+                goto bad;
+            
+            case R_AARCH64_PREL32:
+            
+                reloc->howto = &reloc_howtos[RELOC_TYPE_PC32];
+                reloc->addend += 4;
+                
+                break;
+            
+            case R_AARCH64_ABS64:
+            
+                reloc->howto = &reloc_howtos[RELOC_TYPE_64];
+                
+                integer_to_array (0, part->content + reloc->offset, 8, endianess);
+                break;
+                
+            case R_AARCH64_ABS32:
+            
+                reloc->howto = &reloc_howtos[RELOC_TYPE_32];
+                
+                integer_to_array (0, part->content + reloc->offset, 4, endianess);
+                break;
+            
+            case R_AARCH64_ADR_PREL_PG_HI21:
+            
+                reloc->howto = &reloc_howtos[RELOC_TYPE_AARCH64_ADR_PREL_PG_HI21];
+                break;
+            
+            case R_AARCH64_ADD_ABS_LO12_NC:
+            
+                reloc->howto = &reloc_howtos[RELOC_TYPE_AARCH64_ADD_ABS_LO12_NC];
+                break;
+            
+            case R_AARCH64_LDST8_ABS_LO12_NC:
+            
+                reloc->howto = &reloc_howtos[RELOC_TYPE_AARCH64_LDST8_ABS_LO12_NC];
+                break;
+            
+            case R_AARCH64_LDST16_ABS_LO12_NC:
+            
+                reloc->howto = &reloc_howtos[RELOC_TYPE_AARCH64_LDST16_ABS_LO12_NC];
+                break;
+            
+            case R_AARCH64_LDST32_ABS_LO12_NC:
+            
+                reloc->howto = &reloc_howtos[RELOC_TYPE_AARCH64_LDST32_ABS_LO12_NC];
+                break;
+            
+            case R_AARCH64_LDST64_ABS_LO12_NC:
+            
+                reloc->howto = &reloc_howtos[RELOC_TYPE_AARCH64_LDST64_ABS_LO12_NC];
+                break;
+            
+            case R_AARCH64_LDST128_ABS_LO12_NC:
+            
+                reloc->howto = &reloc_howtos[RELOC_TYPE_AARCH64_LDST128_ABS_LO12_NC];
+                break;
+            
+            case R_AARCH64_JUMP26:
+            
+                reloc->howto = &reloc_howtos[RELOC_TYPE_AARCH64_JUMP26];
+                break;
+            
+            case R_AARCH64_CALL26:
+            
+                reloc->howto = &reloc_howtos[RELOC_TYPE_AARCH64_CALL26];
+                break;
+            
+            case R_AARCH64_ADR_GOT_PAGE:    case R_AARCH64_LD64_GOT_LO12_NC:
+            
+                report_at (__FILE__, __LINE__, REPORT_WARNING, "Position Independent Executables are not supported, ignoring relocation type %u", rel_type);
+                goto bad;
+            
+            default:
+            
+                report_at (__FILE__, __LINE__, REPORT_INTERNAL_ERROR, "+++relocation type 0x%02x not supported yet", rel_type);
+                exit (EXIT_FAILURE);
+        
+        }
+    
+    } else if ((state->format & LD_TARGET_MACHINE_AMD64)) {
     
         switch (rel_type) {
         
@@ -1196,7 +1282,9 @@ uint64_t elf_get_first_section_rva (void) {
 
 #define     PT_LOAD                     1
 #define     EM_I386                     3
+
 #define     EM_AMD64                    62
+#define     EM_AARCH64                  183
 
 static uint32_t translate_section_flags_to_sh_flags (uint32_t flags) {
 
@@ -1580,7 +1668,13 @@ void elf64_write (const char *filename) {
     header.e_ident[EI_VERSION] = EV_CURRENT;
     
     integer_to_array (ET_EXEC, header.e_type, 2, 0);
-    integer_to_array (EM_AMD64, header.e_machine, 2, 0);
+    
+    if ((state->format & LD_TARGET_MACHINE_AARCH64)) {
+        integer_to_array (EM_AARCH64, header.e_machine, 2, 0);
+    } else if ((state->format & LD_TARGET_MACHINE_AMD64)) {
+        integer_to_array (EM_AMD64, header.e_machine, 2, 0);
+    }
+    
     integer_to_array (EV_CURRENT, header.e_version, 4, 0);
     
     integer_to_array (state->entry_point + state->base_address, header.e_entry, 8, 0);

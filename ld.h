@@ -60,6 +60,7 @@ struct ld_state {
 #define     LD_FORMAT_AMD64_ELF         (LD_TARGET_MACHINE_AMD64    | 0x10)
 
 #define     LD_FORMAT_AARCH64_MACHO     (LD_TARGET_MACHINE_AARCH64  | 0x11)
+#define     LD_FORMAT_AARCH64_ELF       (LD_TARGET_MACHINE_AARCH64  | 0x12)
 
 
 extern struct ld_state *state;

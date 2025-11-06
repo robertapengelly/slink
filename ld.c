@@ -536,6 +536,8 @@ int main (int argc, char **argv) {
             state->base_address = 0x100000000;
         } else if (state->format == LD_FORMAT_AMD64_ELF || state->format == LD_FORMAT_I386_ELF) {
             state->base_address = 0x00400000;
+        } else if (state->format == LD_FORMAT_AARCH64_ELF) {
+            state->base_address = 0x140000000;
         }
     
     }
@@ -548,9 +550,9 @@ int main (int argc, char **argv) {
         elks_before_link ();
     } else if (state->format == LD_FORMAT_I386_PE) {
         pe_before_link ();
-    } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
+    } else if (state->format == LD_FORMAT_AARCH64_MACHO || state->format == LD_FORMAT_AMD64_MACHO) {
         macho_before_link ();
-    } else if (state->format == LD_FORMAT_AMD64_ELF || state->format == LD_FORMAT_I386_ELF) {
+    } else if (state->format == LD_FORMAT_AARCH64_ELF || state->format == LD_FORMAT_AMD64_ELF || state->format == LD_FORMAT_I386_ELF) {
         elf_before_link ();
     }
     
@@ -611,7 +613,7 @@ int main (int argc, char **argv) {
         elks_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_ELF) {
         elf32_write (state->output_filename);
-    } else if (state->format == LD_FORMAT_AMD64_ELF) {
+    } else if (state->format == LD_FORMAT_AARCH64_ELF || state->format == LD_FORMAT_AMD64_ELF) {
         elf64_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_PE) {
     
