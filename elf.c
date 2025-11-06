@@ -1294,11 +1294,11 @@ static uint32_t translate_section_flags_to_sh_flags (uint32_t flags) {
         sh_flags |= SHF_WRITE;
     }
     
-    if (flags & SECTION_FLAG_CODE) {
+    if (flags & SECTION_FLAG_ALLOC) {
         sh_flags |= SHF_ALLOC;
     }
     
-    if (!(flags & SECTION_FLAG_NOREAD)) {
+    if (flags & SECTION_FLAG_CODE) {
         sh_flags |= SHF_EXEC_INSTR;
     }
     
