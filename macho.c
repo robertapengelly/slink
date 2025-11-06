@@ -1253,7 +1253,7 @@ void macho_write (const char *filename) {
             symbols_for_each_global (&function_starts_symbol_callback2);
             
             qsort (addresses, num_function_starts_symbols, sizeof (*addresses), &function_starts_address_compare);
-            function_starts = xmalloc (num_function_starts_symbols * (sizeof (uint64_t) * CHAR_BIT / 7 + 1));
+            function_starts = xmalloc (num_function_starts_symbols * (sizeof (uint64_t) * CHAR_BIT / 7 + 1) + 7);
             
             prev_rva = 0;
             p = function_starts;
@@ -1278,7 +1278,11 @@ void macho_write (const char *filename) {
             
             }
             
+            memset (p, 0, 7);
+            
+            p = function_starts + ALIGN (p - function_starts, 8);
             data_size += function_starts_size = p - function_starts;
+            
             free (addresses);
         
         }
