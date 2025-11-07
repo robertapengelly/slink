@@ -96,6 +96,7 @@ struct section_64 {
 
 #define     S_REGULAR                   0x0400
 #define     S_ZEROFILL                  0x0001
+#define     S_CSTRING_LITERALS          0x0002
 
 struct nlist_64 {
 
@@ -349,5 +350,11 @@ void read_macho_object (const char *filename, unsigned char *data, unsigned long
 uint64_t macho_get_first_section_rva (void);
 void macho_before_link (void);
 void macho_write (const char *filename);
+
+
+int macho_check_option (const char *cmd_arg, int argc, char **argv, int *optind, const char **optarg);
+
+void macho_print_help (void);
+void macho_use_option (const char *cmd_arg, int idx, const char *optarg);
 
 #endif      /* _MACHO_H */

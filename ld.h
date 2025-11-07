@@ -44,6 +44,8 @@ struct ld_state {
 #define     LD_EMULATION_I386_ELKS      0x05
 #define     LD_EMULATION_I386_PE        0x06
 
+#define     LD_EMULATION_MACHO          0x07
+
 
 #define     LD_FORMAT_COM               0x00
 #define     LD_FORMAT_MZ                0x01

@@ -12,6 +12,111 @@
 #include    "report.h"
 #include    "section.h"
 
+unsigned long _static = 0;
+#define     LD_OPTION_STATIC                                1
+
+static struct ld_option opts[] = {
+
+    {   "-static",          LD_OPTION_TYPE_LONG,        LD_OPTION_STATIC,       LD_OPTION_NO_ARG    },
+    {   0,                  0,                          0,                      0                   }
+
+};
+
+int macho_check_option (const char *cmd_arg, int argc, char **argv, int *optind, const char **optarg) {
+
+    struct ld_option *popt;
+    
+    for (popt = opts; ; popt++) {
+    
+        const char *p1 = popt->name;
+        const char *r1 = cmd_arg;
+        
+        if (!p1) {
+            break;    
+        }
+        
+        if (!strstart (p1, &r1)) {
+        
+            if (popt->type == LD_OPTION_TYPE_LONG) {
+            
+                if (*r1 != '-') {
+                    continue;
+                }
+                
+                p1 = popt->name + 1;
+                r1 = cmd_arg;
+                
+                if (!strstart (p1, &r1)) {
+                    continue;
+                }
+            
+            } else {
+                continue;
+            }
+        
+        }
+        
+        (*optarg) = r1;
+        
+        if (popt->flgs & LD_OPTION_HAS_ARG) {
+        
+            if (*r1 == '\0') {
+            
+                if ((*optind) >= argc) {
+                
+                    report_at (program_name, 0, REPORT_ERROR, "argument to '%s' is missing", cmd_arg);
+                    exit (EXIT_FAILURE);
+                
+                }
+                
+                (*optarg) = argv[(*optind)++];
+            
+            }
+        
+        } else if (*r1 != '\0') {
+            continue;
+        }
+        
+        return popt->idx;
+    
+    }
+    
+    return -1;
+
+}
+
+void macho_use_option (const char *cmd_arg, int idx, const char *optarg) {
+
+    (void) optarg;
+    
+    switch (idx) {
+    
+        case LD_OPTION_STATIC: {
+        
+            _static = 1;
+            break;
+        
+        }
+        
+        default: {
+        
+            report_at (program_name, 0, REPORT_ERROR, "unsupported option '%s'", cmd_arg);
+            exit (EXIT_FAILURE);
+        
+        }
+    
+    }
+
+}
+
+void macho_print_help (void) {
+
+    fprintf (stderr, "macho:\n\n");
+    fprintf (stderr, "    -static                       Produces a Mach-O file that does not use the dyld.\n");
+
+}
+
+
 #define     PAGE_SIZE                   0x4000
 
 struct part_reloc {
@@ -723,8 +828,8 @@ void read_macho_object (const char *filename, unsigned char *data, unsigned long
 #define     section_in_data_seg(section)                    \
     (!((section)->flags & SECTION_FLAG_CODE))
 
-static struct section *first_data_section;
-static uint64_t first_data_section_alignment;
+static struct section *first_data_section = 0;
+static uint64_t first_data_section_alignment = 0;
 
 void macho_before_link (void) {
 
@@ -1091,14 +1196,15 @@ void macho_write (const char *filename) {
     
         integer_to_array (MH_CPU_TYPE_AMD64, header.cpu_type, 4, 0);
         integer_to_array (MH_CPU_SUBTYPE_I386_ALL, header.cpu_subtype, 4, 0);
-        
-        integer_to_array (MH_NOUNDEFS, header.flags, 4, 0);
     
     } else if (state->format == LD_FORMAT_AARCH64_MACHO) {
-    
         integer_to_array (MH_CPU_TYPE_ARM64, header.cpu_type, 4, 0);
-        integer_to_array (MH_NOUNDEFS | MH_DYLDLINK | MH_TWOLEVEL | MH_PIE, header.flags, 4, 0);
+    }
     
+    if (!_static) {
+        integer_to_array (MH_NOUNDEFS | MH_DYLDLINK | MH_TWOLEVEL | MH_PIE, header.flags, 4, 0);
+    } else {
+        integer_to_array (MH_NOUNDEFS, header.flags, 4, 0);
     }
     
     sizeof_commands += sizeof (segment_cmd);
@@ -1129,7 +1235,7 @@ void macho_write (const char *filename) {
     sizeof_commands += sizeof (segment_cmd);
     num_commands++;
     
-    if (state->format == LD_FORMAT_AARCH64_MACHO) {
+    if (!_static) {
     
         sizeof_commands += sizeof (dyld_chained_fixups_command);
         num_commands++;
@@ -1168,7 +1274,7 @@ void macho_write (const char *filename) {
         sizeof_commands += sizeof (main_command);
         num_commands++;
     
-    } else if (state->format == LD_FORMAT_AMD64_MACHO) {
+    } else {
     
         sizeof_commands += sizeof (symtab_cmd);
         num_commands++;
@@ -1218,7 +1324,7 @@ void macho_write (const char *filename) {
     
     data_size = ALIGN (data_size, PAGE_SIZE);
     
-    if (state->format == LD_FORMAT_AARCH64_MACHO) {
+    if (!_static) {
     
         data_size += sizeof (dyld_chained_fixups_header);
         data_size += sizeof (dyld_chained_starts_in_image) + (NUM_SEGS - 1) * 4 + 4;
@@ -1357,6 +1463,8 @@ void macho_write (const char *filename) {
             
             if (section->flags & SECTION_FLAG_CODE) {
                 integer_to_array ((0x80000000 | S_REGULAR), section_64.flags, 4, 0);
+            } else if (strcmp (section->name, "__cstring") == 0) {
+                integer_to_array (S_CSTRING_LITERALS, section_64.flags, 4, 0);
             }
             
             vm_addr = array_to_integer (segment_cmd.vm_addr, 8, 0);
@@ -1503,7 +1611,7 @@ void macho_write (const char *filename) {
     memcpy (pos, &segment_cmd, sizeof (segment_cmd));
     pos += sizeof (segment_cmd);
     
-    if (state->format == LD_FORMAT_AARCH64_MACHO) {
+    if (!_static) {
     
         integer_to_array (LC_DYLD_CHAINED_FIXUPS, dyld_chained_fixups_command.command, 4, 0);
         integer_to_array (sizeof (dyld_chained_fixups_command), dyld_chained_fixups_command.command_size, 4, 0);
@@ -1721,7 +1829,7 @@ void macho_write (const char *filename) {
         memcpy (pos, &main_command, sizeof (main_command));
         pos += array_to_integer (main_command.command_size, 4, 0);
     
-    } else if (state->format == LD_FORMAT_AMD64_MACHO) {
+    } else {
     
         integer_to_array (LC_SYMTAB, symtab_cmd.command, 4, 0);
         integer_to_array (sizeof (symtab_cmd), symtab_cmd.command_size, 4, 0);

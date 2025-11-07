@@ -10,6 +10,7 @@
 
 #include    "ld.h"
 #include    "lib.h"
+#include    "macho.h"
 #include    "mz.h"
 #include    "pe.h"
 #include    "report.h"
@@ -26,12 +27,13 @@ struct options_with_use {
 
 static struct options_with_use emulation_table[] = {
 
-    {   0,                      0,                      0               },
-    {   &mz_print_help,         &mz_check_option,       &mz_use_option  },
-    {   0,                      0,                      0               },
-    {   0,                      0,                      0               },
-    {   0,                      0,                      0               },
-    {   &pe_print_help,         &pe_check_option,       &pe_use_option  }
+    {   0,                      0,                      0                   },
+    {   &mz_print_help,         &mz_check_option,       &mz_use_option      },
+    {   0,                      0,                      0                   },
+    {   0,                      0,                      0                   },
+    {   0,                      0,                      0                   },
+    {   &pe_print_help,         &pe_check_option,       &pe_use_option      },
+    {   &macho_print_help,      &macho_check_option,    &macho_use_option   },
 
 };
 
@@ -91,7 +93,7 @@ static void print_usage (void) {
         fprintf (stderr, "    -m EMULATION                      Set emulation. (default none)\n");
         fprintf (stderr, "                                          Supported emualtions are:\n");
         fprintf (stderr, "                                              i386aout, i386coff, i386elks, i386pe\n");
-        fprintf (stderr, "                                              ia16_elks, ia16_mz\n");
+        fprintf (stderr, "                                              ia16_elks, ia16_mz, macho\n");
         fprintf (stderr, "    -q, --emit-relocs                 Generate relocations in final output.\n");
         fprintf (stderr, "    -s, --strip-all                   Ignored.\n");
         
@@ -190,6 +192,13 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             if (xstrcasecmp (optarg, "i386pe") == 0) {
             
                 state->emulation = LD_EMULATION_I386_PE;
+                break;
+            
+            }
+            
+            if (xstrcasecmp (optarg, "macho") == 0) {
+            
+                state->emulation = LD_EMULATION_MACHO;
                 break;
             
             }
@@ -309,9 +318,9 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
                 state->format = LD_FORMAT_AMD64_MACHO;
                 
-                /*if (state->emulation == LD_EMULATION_NONE) {
-                    state->emulation = LD_EMULATION_AND64_MACHO;
-                }*/
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_MACHO;
+                }
                 
                 break;
             
@@ -321,9 +330,9 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
                 state->format = LD_FORMAT_AARCH64_MACHO;
                 
-                /*if (state->emulation == LD_EMULATION_NONE) {
-                    state->emulation = LD_EMULATION_AND64_MACHO;
-                }*/
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_MACHO;
+                }
                 
                 break;
             
