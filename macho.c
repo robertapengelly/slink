@@ -685,11 +685,16 @@ void read_macho_object (const char *filename, unsigned char *data, unsigned long
                             
                             bss_part->content_size = symbol->size = symbol->value;
                             
+#if     0
                             if (bss_part->content_size > PAGE_SIZE) {
                                 bss_part->alignment = PAGE_SIZE;
                             } else {
                                 bss_part->alignment = bss_part->content_size;
                             }
+#else
+                            /* Assume everything needed at most 16-byte alignment. */
+                            bss_part->alignment = 16;
+#endif
                             
                             symbol->part = bss_part;
                             symbol->value = 0;
