@@ -409,10 +409,10 @@ void read_macho_object (const char *filename, unsigned char *data, unsigned long
     long bss_section_number = 0;
     
     char *section_name, *segment_name, *string_table;
-    unsigned long num_symbols = 0, num_sections = 0;
+    uint64_t num_symbols = 0, num_sections = 0;
     
-    unsigned long sizeof_cmds, cmd_size, i, j, k;
     struct load_command *load_command;
+    uint64_t sizeof_cmds, cmd_size, i, j, k;
     
     unsigned long num_cmds, num_sects, num_syms, n_strx, cpu_type;
     unsigned char *sym_pos;
@@ -454,7 +454,7 @@ void read_macho_object (const char *filename, unsigned char *data, unsigned long
     
         load_command = (struct load_command *) pos;
         
-        if (pos - data + sizeof (*load_command) > sizeof (*header) + sizeof_cmds) {
+        if ((pos - data) + sizeof (*load_command) > sizeof (*header) + sizeof_cmds) {
         
             report_at (program_name, 0, REPORT_ERROR, "%s: invalid header size of commands / number of commands", filename);
             return;
@@ -463,7 +463,7 @@ void read_macho_object (const char *filename, unsigned char *data, unsigned long
         
         cmd_size = array_to_integer (load_command->command_size, 4, 0);
         
-        if (pos - data + cmd_size > sizeof (*header) + sizeof_cmds) {
+        if ((pos - data) + cmd_size > sizeof (*header) + sizeof_cmds) {
         
             report_at (program_name, 0, REPORT_ERROR, "%s: invalid load command command size", filename);
             return;
