@@ -9,7 +9,7 @@
 # define    I64_FMT                     "I64"
 #elif   defined (__PRI_64_LENGTH_MODIFIER__)                                                        /* Mac */
 # define    I64_FMT                     __PRI_64_LENGTH_MODIFIER__
-#elif   (defined (SIZEOF_LONG) && SIZEOF_LONG >= 8) || ULONG_MAX > 4294967295UL
+#elif   (defined (SIZEOF_LONG) && SIZEOF_LONG >= 8) || ((ULONG_MAX >> 16) >> 16) == 0xffffffff
 # define    I64_FMT                     "l"
 #else
 # define    I64_FMT                     "ll"

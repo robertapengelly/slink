@@ -8,6 +8,7 @@
 #include    "aout.h"
 #include    "ar.h"
 #include    "coff.h"
+#include    "dx.h"
 #include    "elf.h"
 #include    "elks.h"
 #include    "ld.h"
@@ -501,11 +502,15 @@ int main (int argc, char **argv) {
     
     }
     
-    if (state->format == LD_FORMAT_I386_AOUT || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_MZ) {
+    if (state->format == LD_FORMAT_I386_AOUT || state->format == LD_FORMAT_I386_DX || state->format == LD_FORMAT_IA16_DX || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_MZ) {
     
         section_find_or_make (".text");
         section_find_or_make (".data");
         section_find_or_make (".bss");
+        
+        if (state->format == LD_FORMAT_IA16_DX) {
+            state->impure = 1;
+        }
     
     }
     
@@ -532,20 +537,29 @@ int main (int argc, char **argv) {
                 state->base_address = 0x00400000;
             }
         
+        } else if (state->format == LD_FORMAT_AMD64_ELF || state->format == LD_FORMAT_I386_ELF) {
+            state->base_address = 0x0040000;
+#if     defined(NO_LONG_LONG)
+        } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
+            state->base_address = 0x10000000;
+        } else if (state->format == LD_FORMAT_AARCH64_ELF) {
+            state->base_address = 0x14000000;
+        }
+#else
         } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
             state->base_address = 0x100000000;
-        } else if (state->format == LD_FORMAT_AMD64_ELF || state->format == LD_FORMAT_I386_ELF) {
-            state->base_address = 0x00400000;
         } else if (state->format == LD_FORMAT_AARCH64_ELF) {
             state->base_address = 0x140000000;
         }
-    
+#endif
     }
     
     if (state->format == LD_FORMAT_I386_AOUT) {
         aout_before_link ();
     } else if (state->format == LD_FORMAT_I386_COFF) {
         coff_before_link ();
+    } else if (state->format == LD_FORMAT_I386_DX) {
+        dx_before_link ();
     } else if (state->format == LD_FORMAT_I386_ELKS) {
         elks_before_link ();
     } else if (state->format == LD_FORMAT_I386_PE) {
@@ -609,12 +623,12 @@ int main (int argc, char **argv) {
         mz_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_AOUT) {
         aout_write (state->output_filename);
+    } else if (state->format == LD_FORMAT_I386_DX || state->format == LD_FORMAT_IA16_DX) {
+        dx_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS) {
         elks_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_ELF) {
         elf32_write (state->output_filename);
-    } else if (state->format == LD_FORMAT_AARCH64_ELF || state->format == LD_FORMAT_AMD64_ELF) {
-        elf64_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_PE) {
     
         pe_after_link ();
@@ -625,6 +639,8 @@ int main (int argc, char **argv) {
         coff_after_link ();
         coff_write (state->output_filename);
     
+    } else if (state->format == LD_FORMAT_AARCH64_ELF || state->format == LD_FORMAT_AMD64_ELF) {
+        elf64_write (state->output_filename);
     } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
         macho_write (state->output_filename);
     }

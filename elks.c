@@ -542,7 +542,6 @@ void elks_write (const char *filename) {
     image_size += 4;
     
     data = xmalloc (image_size);
-    data = xmalloc (data_size);
     memcpy (data, &exec, sizeof (exec));
     
     pos = data + sizeof (exec);

@@ -58,8 +58,8 @@ struct elks_nlist {
 
 };
 
-#define     N_TYPE                      0x1e
 #define     ELKS_MAGIC                  0403
+#define     N_TYPE                      0x1e
 
 void read_elks_object (const char *filename, unsigned char *data, unsigned long data_size);
 

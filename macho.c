@@ -1044,7 +1044,30 @@ static void calculate_chained_fixups (struct chained_fixup_starts *cfs, int doin
             uint64_t result = array_to_integer (p->part->content + p->reloc_entry->offset, 8, 0);
             result -= state->base_address;
             
-#if     !defined (NO_LONG_LONG) || ULONG_MAX > 4294967295UL
+#if     defined (NO_LONG_LONG) && ((ULONG_MAX >> 16) >> 16) < 0xffffffff
+
+            integer_to_array (result, p->part->content + p->reloc_entry->offset, 4, 0);
+            
+            if (p + 1 != part_rels + num_relocs) {
+            
+                uint64_t rva1, rva2;
+                
+                rva1 = p->part->rva + p->reloc_entry->offset;
+                rva2 = p[1].part->rva + p[1].reloc_entry->offset;
+                
+                if (FLOOR_TO (rva1, PAGE_SIZE) != FLOOR_TO (rva2, PAGE_SIZE)) {
+                
+                    p++;
+                    break;
+                
+                }
+                
+                result = (((rva2 - rva1) / 4) & 0xfff) << 19;
+                integer_to_array (result, p->part->content + p->reloc_entry->offset + 4, 4, 0);
+            
+            }
+
+#else
 
             result &= 0xfffffffff;
             
@@ -1067,10 +1090,10 @@ static void calculate_chained_fixups (struct chained_fixup_starts *cfs, int doin
                 result |= (((rva2 - rva1) / 4) & 0xfff) << 51;
             
             }
-
-#endif
             
             integer_to_array (result, p->part->content + p->reloc_entry->offset, 8, 0);
+
+#endif
         
         }
     

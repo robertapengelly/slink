@@ -154,9 +154,9 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
         
         case LD_OPTION_EMULATION: {
         
-            if (xstrcasecmp (optarg, "ia16_elks") == 0) {
+            if (xstrcasecmp (optarg, "ia16_dx") == 0) {
             
-                state->emulation = LD_EMULATION_IA16_ELKS;
+                state->emulation = LD_EMULATION_IA16_DX;
                 break;
             
             }
@@ -182,9 +182,9 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
             }
             
-            if (xstrcasecmp (optarg, "i386elks") == 0) {
+            if (xstrcasecmp (optarg, "i386dx") == 0) {
             
-                state->emulation = LD_EMULATION_I386_ELKS;
+                state->emulation = LD_EMULATION_I386_DX;
                 break;
             
             }
@@ -254,13 +254,37 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
             }
             
+            if (xstrcasecmp (optarg, "dx-ia16") == 0) {
+            
+                state->format = LD_FORMAT_IA16_DX;
+                
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_IA16_DX;
+                }
+                
+                break;
+            
+            }
+            
+            if (xstrcasecmp (optarg, "dx-i386") == 0) {
+            
+                state->format = LD_FORMAT_I386_DX;
+                
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_I386_DX;
+                }
+                
+                break;
+            
+            }
+            
             if (xstrcasecmp (optarg, "elks-ia16") == 0) {
             
                 state->format = LD_FORMAT_IA16_ELKS;
                 
-                if (state->emulation == LD_EMULATION_NONE) {
+                /*if (state->emulation == LD_EMULATION_NONE) {
                     state->emulation = LD_EMULATION_IA16_ELKS;
-                }
+                }*/
                 
                 break;
             
@@ -270,9 +294,9 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
                 state->format = LD_FORMAT_I386_ELKS;
                 
-                if (state->emulation == LD_EMULATION_NONE) {
+                /*if (state->emulation == LD_EMULATION_NONE) {
                     state->emulation = LD_EMULATION_I386_ELKS;
-                }
+                }*/
                 
                 break;
             
@@ -466,7 +490,7 @@ uint64_t array_to_integer (unsigned char *arr, int size, int big_endian) {
     uint64_t value = 0;
     int i;
     
-#if     defined (NO_LONG_LONG) && ULONG_MAX <= 4294967295UL
+#if     defined (NO_LONG_LONG) && ((ULONG_MAX >> 16) >> 16) < 0xffffffff
     if (size == 8) { size = 4; }
 #endif
     
@@ -492,7 +516,7 @@ uint64_t array_to_integer (unsigned char *arr, int size, int big_endian) {
 
 void integer_to_array (uint64_t value, unsigned char *dest, int size, int big_endian) {
 
-#if     defined (NO_LONG_LONG) && ULONG_MAX <= 4294967295UL
+#if     defined (NO_LONG_LONG) && ((ULONG_MAX >> 16) >> 16) < 0xffffffff
     if (size == 8) { size = 4; }
 #endif
     

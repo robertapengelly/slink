@@ -28,7 +28,7 @@ typedef     unsigned long               uint32_t;
 
 #ifndef     _INT64_T
 #define     _INT64_T
-#if     defined (NO_LONG_LONG) || ULONG_MAX > 4294967295UL
+#if     defined (NO_LONG_LONG) || ((ULONG_MAX >> 16) >> 16) == 0xffffffff
 typedef     signed long                 int64_t;
 #else
 typedef     signed long long            int64_t;
@@ -37,7 +37,7 @@ typedef     signed long long            int64_t;
 
 #ifndef     _UINT64_T
 #define     _UINT64_T
-#if     defined (NO_LONG_LONG) || ULONG_MAX > 4294967295UL
+#if     defined (NO_LONG_LONG) || ((ULONG_MAX >> 16) >> 16) == 0xffffffff
 typedef     unsigned long               uint64_t;
 #else
 typedef     unsigned long long          uint64_t;

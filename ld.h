@@ -36,12 +36,12 @@ struct ld_state {
 
 #define     LD_EMULATION_NONE           0x00
 
-#define     LD_EMULATION_IA16_ELKS      0x01
+#define     LD_EMULATION_IA16_DX        0x01
 #define     LD_EMULATION_IA16_MZ        0x02
 
 #define     LD_EMULATION_I386_AOUT      0x03
 #define     LD_EMULATION_I386_COFF      0x04
-#define     LD_EMULATION_I386_ELKS      0x05
+#define     LD_EMULATION_I386_DX        0x05
 #define     LD_EMULATION_I386_PE        0x06
 
 #define     LD_EMULATION_MACHO          0x07
@@ -50,19 +50,22 @@ struct ld_state {
 #define     LD_FORMAT_COM               0x00
 #define     LD_FORMAT_MZ                0x01
 #define     LD_FORMAT_BIN               0x02
+
 #define     LD_FORMAT_IA16_ELKS         0x03
+#define     LD_FORMAT_IA16_DX           0x04
 
-#define     LD_FORMAT_I386_ELKS         (LD_TARGET_MACHINE_I386     | 0x04)
-#define     LD_FORMAT_I386_AOUT         (LD_TARGET_MACHINE_I386     | 0x05)
-#define     LD_FORMAT_I386_COFF         (LD_TARGET_MACHINE_I386     | 0x06)
-#define     LD_FORMAT_I386_PE           (LD_TARGET_MACHINE_I386     | 0x07)
-#define     LD_FORMAT_I386_ELF          (LD_TARGET_MACHINE_I386     | 0x08)
+#define     LD_FORMAT_I386_ELKS         (LD_TARGET_MACHINE_I386     | 0x05)
+#define     LD_FORMAT_I386_DX           (LD_TARGET_MACHINE_I386     | 0x06)
+#define     LD_FORMAT_I386_AOUT         (LD_TARGET_MACHINE_I386     | 0x07)
+#define     LD_FORMAT_I386_COFF         (LD_TARGET_MACHINE_I386     | 0x08)
+#define     LD_FORMAT_I386_PE           (LD_TARGET_MACHINE_I386     | 0x09)
+#define     LD_FORMAT_I386_ELF          (LD_TARGET_MACHINE_I386     | 0x10)
 
-#define     LD_FORMAT_AMD64_MACHO       (LD_TARGET_MACHINE_AMD64    | 0x09)
-#define     LD_FORMAT_AMD64_ELF         (LD_TARGET_MACHINE_AMD64    | 0x10)
+#define     LD_FORMAT_AMD64_MACHO       (LD_TARGET_MACHINE_AMD64    | 0x11)
+#define     LD_FORMAT_AMD64_ELF         (LD_TARGET_MACHINE_AMD64    | 0x12)
 
-#define     LD_FORMAT_AARCH64_MACHO     (LD_TARGET_MACHINE_AARCH64  | 0x11)
-#define     LD_FORMAT_AARCH64_ELF       (LD_TARGET_MACHINE_AARCH64  | 0x12)
+#define     LD_FORMAT_AARCH64_MACHO     (LD_TARGET_MACHINE_AARCH64  | 0x13)
+#define     LD_FORMAT_AARCH64_ELF       (LD_TARGET_MACHINE_AARCH64  | 0x14)
 
 
 extern struct ld_state *state;
