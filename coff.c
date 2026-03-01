@@ -44,10 +44,14 @@ struct symbol_table_entry {
 
 static void translate_relocation (struct reloc_entry *reloc, struct coff_relocation_entry *input, struct section_part *part) {
 
+    uint16_t type;
+    
     reloc->symbol = part->of->symbol_arr + array_to_integer (input->SymbolTableIndex, 4, 0);
     reloc->offset = array_to_integer (input->VirtualAddress, 4, 0);
     
-    switch (array_to_integer (input->Type, 2, 0)) {
+    type = array_to_integer (input->Type, 2, 0);
+    
+    switch (type) {
     
         case IMAGE_REL_I386_ABSOLUTE:
         

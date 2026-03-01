@@ -10,7 +10,7 @@ all: slink.exe
 
 slink.exe: $(SRC)
 
-	wcl -fe=$@ $^
+	wcl -ml -fe=$@ $^
 
 clean:
 

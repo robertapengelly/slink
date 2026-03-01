@@ -29,9 +29,9 @@ struct ld_state {
 };
 
 
-#define     LD_TARGET_MACHINE_AARCH64                       (1U << 15)
-#define     LD_TARGET_MACHINE_AMD64                         (1U << 14)
-#define     LD_TARGET_MACHINE_I386                          (1U << 13)
+#define     LD_TARGET_MACHINE_AARCH64                       (1U << 14)
+#define     LD_TARGET_MACHINE_AMD64                         (1U << 13)
+#define     LD_TARGET_MACHINE_I386                          (1U << 12)
 
 
 #define     LD_EMULATION_NONE           0x00

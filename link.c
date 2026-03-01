@@ -585,7 +585,9 @@ static void calculate_section_sizes_and_rvas (void) {
 static void reloc_generic (struct section_part *part, struct reloc_entry *rel, struct symbol *symbol) {
 
     unsigned char opcode = (part->content + rel->offset - 1)[0];
-    uint64_t result = 0, size = rel->howto->size, offset = rel->offset;
+    int size = rel->howto->size;
+    
+    uint64_t result = 0, offset = rel->offset;
     
     switch (size) {
     
