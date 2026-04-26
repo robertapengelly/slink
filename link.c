@@ -585,11 +585,9 @@ static void calculate_section_sizes_and_rvas (void) {
 static void reloc_generic (struct section_part *part, struct reloc_entry *rel, struct symbol *symbol) {
 
     unsigned char opcode = (part->content + rel->offset - 1)[0];
-    int size = rel->howto->size;
-    
     uint64_t result = 0, offset = rel->offset;
     
-    switch (size) {
+    switch (rel->howto->size) {
     
         case 8: {
         
@@ -644,7 +642,7 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
         if (rel->howto->pc_rel) {
         
             result -= (part->rva + offset);
-            result -= size;
+            result -= rel->howto->size;
         
         }
     
@@ -702,9 +700,9 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
     
     }
     
-    if ((unsigned long) size < sizeof (result)) {
+    if ((unsigned long) rel->howto->size < sizeof (result)) {
     
-        unsigned long mask = (((uint64_t) 1) << (CHAR_BIT * size)) - 1;
+        unsigned long mask = (((uint64_t) 1) << (CHAR_BIT * rel->howto->size)) - 1;
         result &= mask;
     
     }
@@ -756,7 +754,7 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
                 }
                 
                 /*printf ("relocating: %s: %lx, %lx, %lx\n", rel->symbol->name, part->rva + offset + 0x60, result, size);*/
-                size = 4;
+                rel->howto->size = 4;
             
             } else if (opcode == 0x9A || opcode == 0xFF) {
             
@@ -777,10 +775,10 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
                     *(p + 3) = 0x90;
                     
                     result -= part->rva + offset;
-                    result -= size;
+                    result -= 4;
                     
-                    while (size > 2) {
-                        size--;
+                    while (rel->howto->size > 2) {
+                        rel->howto->size--;
                     }
                     
                     offset++;
@@ -793,14 +791,13 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
                     *(p + 1) = 0xE8;
                     
                     result -= part->rva + offset;
-                    result -= size;
+                    result -= 4;
                     
-                    while (size > 2) {
-                    
-                        offset++;
-                        size--;
-                    
+                    while (rel->howto->size > 2) {
+                        rel->howto->size--;
                     }
+                    
+                    offset += 2;
                 
                 }
             
@@ -822,7 +819,7 @@ static void reloc_generic (struct section_part *part, struct reloc_entry *rel, s
     
     }
     
-    switch (size) {
+    switch (rel->howto->size) {
     
         case 8: {
         

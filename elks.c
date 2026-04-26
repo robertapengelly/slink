@@ -20,7 +20,7 @@ static void translate_relocation (struct reloc_entry *reloc, struct elks_relocat
     unsigned long r_symbolnum = array_to_integer (input_reloc->r_symbolnum, 4, 0);
     
     unsigned long r_address = array_to_integer (input_reloc->r_address, 4, 0);
-    long symbolnum = (r_symbolnum & 0x7ffffff);
+    unsigned long symbolnum = (r_symbolnum & 0x7ffffff);
     
     if ((r_symbolnum >> 31) & 1) {      /* ext */
     
@@ -110,7 +110,7 @@ static void translate_relocation (struct reloc_entry *reloc, struct elks_relocat
             if ((r_symbolnum >> 28) & 1) {
             
                 reloc->howto = &reloc_howtos[RELOC_TYPE_PC8];
-                reloc->addend += reloc->offset + 4;
+                reloc->addend += reloc->offset + 1;
             
             } else {
                 reloc->howto = &reloc_howtos[RELOC_TYPE_8];
