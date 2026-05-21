@@ -94,6 +94,10 @@ static void print_usage (void) {
         fprintf (stderr, "                                          Supported emualtions are:\n");
         fprintf (stderr, "                                              i386aout, i386coff, i386elks, i386pe\n");
         fprintf (stderr, "                                              ia16_elks, ia16_mz, macho\n");
+        fprintf (stderr, "    -o OBJFILE                        Name the object-file output OBJFILE (default a.out).\n");
+        
+        fprintf (stderr, "\n");
+        
         fprintf (stderr, "    -q, --emit-relocs                 Generate relocations in final output.\n");
         fprintf (stderr, "    -s, --strip-all                   Ignored.\n");
         
