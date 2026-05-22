@@ -33,7 +33,7 @@ static struct options_with_use emulation_table[] = {
     {   0,                      0,                      0                   },
     {   0,                      0,                      0                   },
     {   &pe_print_help,         &pe_check_option,       &pe_use_option      },
-    {   &macho_print_help,      &macho_check_option,    &macho_use_option   },
+    {   &macho_print_help,      &macho_check_option,    &macho_use_option   }
 
 };
 
@@ -544,6 +544,16 @@ void integer_to_array (uint64_t value, unsigned char *dest, int size, int big_en
 
 }
 
+char *skip_whitespace (char *p) {
+
+    while (isspace ((int) *p)) {
+        p++;
+    }
+    
+    return p;
+
+}
+
 char *xstrdup (const char *__p) {
 
     char *p = xmalloc (strlen (__p) + 1);
@@ -637,8 +647,8 @@ void dynarray_add (void *ptab, long *nb_ptr, void *data) {
 
 void parse_args (int argc, char **argv, int optind) {
 
-    struct options_with_use *options_with_use;
-    struct ld_option *popt;
+    struct options_with_use *options_with_use = { 0 };
+    struct ld_option *popt = { 0 };
     
     const char *optarg, *r;
     

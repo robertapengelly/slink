@@ -25,8 +25,9 @@ uint64_t array_to_integer (unsigned char *arr, int size, int big_endian);
 void integer_to_array (uint64_t value, unsigned char *dest, int size, int big_endian);
 
 int xstrcasecmp (const char *__s1, const char *__s2);
-
 int strstart (const char *val, const char **str);
+
+char *skip_whitespace (char *p);
 void dynarray_add (void *ptab, long *nb_ptr, void *data);
 
 char *xstrdup (const char *__p);
