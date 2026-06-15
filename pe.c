@@ -24,8 +24,8 @@ static int kill_at = 0, leading_underscore = 1;
 
 static unsigned short subsystem = IMAGE_SUBSYSTEM_WINDOWS_CUI;
 
-static unsigned long section_alignment = DEFAULT_SECTION_ALIGNMENT;
-static unsigned long file_alignment = DEFAULT_FILE_ALIGNMENT;
+static uint64_t section_alignment = DEFAULT_SECTION_ALIGNMENT;
+static uint64_t file_alignment = DEFAULT_FILE_ALIGNMENT;
 
 static const char **def_list = 0;
 long nb_def_list = 0;
@@ -327,7 +327,7 @@ static void export_symbol_callback (struct symbol *symbol) {
     }
     
     name_list->info = (symbol->part->section->flags & SECTION_FLAG_CODE) ? 0 : 1;
-    name_list->next = NULL;
+    name_list->next = 0;
     
     *last_export_name_list_p = name_list;
     last_export_name_list_p = &name_list->next;
@@ -684,7 +684,7 @@ _finish:
 
 static struct section *last_section = 0;
 
-static unsigned long base_of_code = 0;
+static uint64_t base_of_code = 0;
 static unsigned long base_of_data = 0;
 
 static unsigned long size_of_code = 0;
@@ -948,10 +948,9 @@ struct symbol_info *create_symbol_list (struct export_name *export_name, unsigne
     
     free (name);
     
-    for (i = 0; i < num_names; i++, j++) {
+    for (i = 0, j = 0; i < num_names; i++, j++) {
     
         symbol_info = xmalloc (sizeof (*symbol_info));
-        
         symbol_info->name = xmalloc (7 + strlen (export_name[i].name) + 1);
         
         if (leading_underscore) {
@@ -1128,7 +1127,7 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     info_list = create_symbol_list (export_names, num_names);
     
     offset_count = 2 + 3 + num_names;
-    offsets = xmalloc (offset_count * 4);
+    offsets = xmalloc (offset_count * 8);
     
     module_name = xstrdup (state->output_filename);
     
@@ -1557,8 +1556,14 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
         
         memset (&import_hdr, 0, sizeof (import_hdr));
         
+        integer_to_array (IMAGE_FILE_MACHINE_UNKNOWN, import_hdr.Magic1, 2, 0);
         integer_to_array (0xFFFF, import_hdr.Magic2, 2, 0);
-        integer_to_array (IMAGE_FILE_MACHINE_I386, import_hdr.Machine, 2, 0);
+        
+        if (state->format == LD_FORMAT_AMD64_PE) {
+            integer_to_array (IMAGE_FILE_MACHINE_AMD64, import_hdr.Machine, 2, 0);
+        } else {
+            integer_to_array (IMAGE_FILE_MACHINE_I386, import_hdr.Machine, 2, 0);
+        }
         
         if (leading_underscore) {
             integer_to_array (1 + strlen (export_names[i].name) + 1 + module_name_length + 1, import_hdr.SizeOfData, 4, 0);
@@ -1930,7 +1935,13 @@ void pe_before_link (void) {
     
     }
     
-    state->size_of_headers = sizeof (struct msdos_header) + sizeof (dos_stub) + sizeof (struct pe_header) + sizeof (struct pe_optional_header);
+    state->size_of_headers = sizeof (struct msdos_header) + sizeof (dos_stub) + sizeof (struct pe_header);
+    
+    if (state->format == LD_FORMAT_AMD64_PE) {
+        state->size_of_headers += sizeof (struct pe_optional_header_plus);
+    } else {
+        state->size_of_headers += sizeof (struct pe_optional_header);
+    }
     
     state->size_of_headers += NUMBER_OF_DATA_DIRECTORIES * sizeof (struct pe_image_data_directory);
     state->size_of_headers += sizeof (struct pe_section_table_entry) * section_count ();
@@ -1966,7 +1977,7 @@ void pe_before_link (void) {
 
 }
 
-void pe_write (const char *filename) {
+void pe32_write (const char *filename) {
 
     FILE *fp;
     
@@ -2090,9 +2101,9 @@ void pe_write (const char *filename) {
     
         unsigned short characteristics = IMAGE_DLLCHARACTERISTICS_NX_COMPAT;
         
-        if (can_be_relocated) {
+        /*if (can_be_relocated) {
             characteristics |= IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE;
-        }
+        }*/
         
         write721_to_byte_array (opthdr->DllCharacteristics, characteristics);
     
@@ -2121,6 +2132,263 @@ void pe_write (const char *filename) {
             write741_to_byte_array (opthdr->SizeOfStackCommit, ALIGN (stack_addr % 16 + stack_size, section_alignment));
             write741_to_byte_array (opthdr->SizeOfHeapReserved, section_alignment << 8);
             write741_to_byte_array (opthdr->SizeOfHeapCommit, ALIGN (stack_addr % 16 + stack_size, section_alignment));
+        
+        }
+    
+    }
+    
+    write741_to_byte_array (opthdr->NumberOfRvaAndSizes, NUMBER_OF_DATA_DIRECTORIES);
+    
+    
+    {
+    
+        struct pe_image_data_directory *idd;
+        int i;
+        
+        for (i = 0; i < NUMBER_OF_DATA_DIRECTORIES; i++) {
+        
+            idd = (struct pe_image_data_directory *) pos;
+            
+            switch (i) {
+            
+                case 0:
+                
+                    /* EXPORT Table. */
+                    if ((section = section_find (".edata"))) {
+                    
+                        write741_to_byte_array (idd->VirtualAddress, section->rva);
+                        write741_to_byte_array (idd->Size, section->total_size);
+                    
+                    }
+                    
+                    break;
+                
+                case 1:
+                
+                    /* IMPORT Table. */
+                    if ((section = section_find (".idata"))) {
+                    
+                        write741_to_byte_array (idd->VirtualAddress, section->rva);
+                        write741_to_byte_array (idd->Size, section->total_size);
+                    
+                    }
+                    
+                    break;
+                
+                case 5:
+                
+                    /* BASE RELOCATION Table. */
+                    if ((section = section_find (".reloc"))) {
+                    
+                        write741_to_byte_array (idd->VirtualAddress, section->rva);
+                        write741_to_byte_array (idd->Size, section->total_size);
+                    
+                    }
+                    
+                    break;
+                
+                case 12:
+                
+                    /* IMPORT Address Table. */
+                    if ((section = section_find (".idata")) && iat_first_part) {
+                    
+                        write741_to_byte_array (idd->VirtualAddress, iat_first_part->rva);
+                        write741_to_byte_array (idd->Size, iat_last_part->rva + iat_last_part->content_size - iat_first_part->rva);
+                    
+                    }
+                    
+                    break;
+            
+            }
+            
+            pos += sizeof (*idd);
+        
+        }
+    
+    }
+    
+    
+    for (section = all_sections; section; section = section->next) {
+    
+        struct pe_section_table_entry *hdr = section->object_dependent_data;
+        
+        memcpy (pos, hdr, sizeof (*hdr));
+        pos += sizeof (*hdr);
+        
+        free (hdr);
+    
+    }
+    
+    
+    checksum_pos = sizeof (*doshdr) + sizeof (dos_stub) + sizeof (*pehdr) + offsetof (struct pe_optional_header, Checksum);
+    write741_to_byte_array (opthdr->Checksum, calculate_checksum (data, checksum_pos, data_size));
+    
+    if (fwrite (data, data_size, 1, fp) != 1) {
+        report_at (program_name, 0, REPORT_ERROR, "failed to write data to '%s'", filename);
+    }
+    
+    free (data);
+    fclose (fp);
+
+}
+
+void pe64_write (const char *filename) {
+
+    FILE *fp;
+    
+    unsigned long data_size = 0, checksum_pos = 0;
+    unsigned char *data, *pos;
+    
+    struct msdos_header *doshdr;
+    struct pe_header *pehdr;
+    struct pe_optional_header_plus *opthdr;
+    
+    struct section *section;
+    unsigned long size_of_optional_header;
+    
+    if (!(fp = fopen (filename, "wb"))) {
+    
+        report_at (program_name, 0, REPORT_ERROR, "failed to open '%s' for writing", filename);
+        return;
+    
+    }
+    
+    for (section = all_sections; section; section = section->next) {
+    
+        if (!section->is_bss) {
+            data_size += ALIGN (section->total_size, file_alignment);
+        }
+    
+    }
+    
+    data_size += state->size_of_headers;
+    
+    data = xmalloc (data_size);
+    write_sections (data);
+    
+    doshdr = (struct msdos_header *) data;
+    
+    pehdr = (struct pe_header *) ((char *) doshdr + sizeof (*doshdr) + sizeof (dos_stub));
+    opthdr = (struct pe_optional_header_plus *) ((char *) pehdr + sizeof (*pehdr));
+    
+    pos = (unsigned char *) opthdr + sizeof (*opthdr);
+    
+    doshdr->e_magic[0] = 'M';
+    doshdr->e_magic[1] = 'Z';
+    
+    write721_to_byte_array (doshdr->e_cblp, 0x0090);
+    write721_to_byte_array (doshdr->e_cp, 0x0003);
+    
+    write721_to_byte_array (doshdr->e_cparhdr, ALIGN (sizeof (*doshdr), 16) / 16);
+    
+    write721_to_byte_array (doshdr->e_maxalloc, 0xFFFF);
+    write721_to_byte_array (doshdr->e_sp, 0x00B8);
+    
+    write721_to_byte_array (doshdr->e_lfarlc, sizeof (*doshdr));
+    write741_to_byte_array (doshdr->e_lfanew, sizeof (*doshdr) + sizeof (dos_stub));
+    
+    memcpy ((char *) data + array_to_integer (doshdr->e_lfarlc, 2, 0), dos_stub, sizeof (dos_stub));
+    
+    
+    pehdr->Signature[0] = 'P';
+    pehdr->Signature[1] = 'E';
+    
+    write721_to_byte_array (pehdr->Machine, IMAGE_FILE_MACHINE_AMD64);
+    write721_to_byte_array (pehdr->NumberOfSections, section_count ());
+    write741_to_byte_array (pehdr->TimeDateStamp, time (0));
+    
+    size_of_optional_header = sizeof (*opthdr);
+    size_of_optional_header += NUMBER_OF_DATA_DIRECTORIES * sizeof (struct pe_image_data_directory);
+    write721_to_byte_array (pehdr->SizeOfOptionalHeader, size_of_optional_header);
+    
+    {
+    
+        unsigned short characteristics = 0;
+        
+        characteristics |= IMAGE_FILE_EXECUTABLE_IMAGE;
+        /*characteristics |= IMAGE_FILE_LINE_NUMS_STRIPPED;*/
+        /*characteristics |= IMAGE_FILE_LOCAL_SYMS_STRIPPED;*/
+        characteristics |= IMAGE_FILE_LARGE_ADDRESS_AWARE;
+        characteristics |= IMAGE_FILE_DEBUG_STRIPPED;
+        
+        if (state->create_shared_library) {
+            characteristics |= IMAGE_FILE_DLL;
+        }
+        
+        if (!can_be_relocated) {
+            characteristics |= IMAGE_FILE_RELOCS_STRIPPED;
+        }
+        
+        write721_to_byte_array (pehdr->Characteristics, characteristics);
+    
+    }
+    
+    
+    write721_to_byte_array (opthdr->Magic, IMAGE_FILE_MAGIC_AMD64);
+    
+    opthdr->MajorLinkerVersion = 0;
+    opthdr->MinorLinkerVersion = 10;
+    
+    write741_to_byte_array (opthdr->SizeOfCode, ALIGN (size_of_code, file_alignment));
+    write741_to_byte_array (opthdr->SizeOfInitializedData, ALIGN (size_of_initialized_data, file_alignment));
+    write741_to_byte_array (opthdr->SizeOfUninitializedData, ALIGN (size_of_uninitialized_data, file_alignment));
+    
+    write741_to_byte_array (opthdr->AddressOfEntryPoint, state->entry_point);
+    
+    write741_to_byte_array (opthdr->BaseOfCode, base_of_code);
+    integer_to_array (state->base_address, opthdr->ImageBase, 8, 0);
+    
+    write741_to_byte_array (opthdr->SectionAlignment, section_alignment);
+    write741_to_byte_array (opthdr->FileAlignment, file_alignment);
+    
+    write721_to_byte_array (opthdr->MajorOperatingSystemVersion, 4);
+    write721_to_byte_array (opthdr->MajorImageVersion, 1);
+    write721_to_byte_array (opthdr->MajorSubsystemVersion, 4);
+    
+    if (last_section) {
+        write741_to_byte_array (opthdr->SizeOfImage, ALIGN (last_section->rva + last_section->total_size, section_alignment));
+    } else {
+        write741_to_byte_array (opthdr->SizeOfImage, ALIGN (state->size_of_headers, section_alignment));
+    }
+    
+    write741_to_byte_array (opthdr->SizeOfHeaders, state->size_of_headers);
+    write721_to_byte_array (opthdr->Subsystem, subsystem);
+    
+    {
+    
+        unsigned short characteristics = IMAGE_DLLCHARACTERISTICS_NX_COMPAT;
+        
+        /*if (can_be_relocated) {
+            characteristics |= IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE;
+        }*/
+        
+        write721_to_byte_array (opthdr->DllCharacteristics, characteristics);
+    
+    }
+    
+    {
+    
+        struct section *bss_section;
+        
+        if (!(bss_section = section_find (".bss"))) {
+        
+            integer_to_array (section_alignment << 9, opthdr->SizeOfStackReserved, 8, 0);
+            integer_to_array (0x1000, opthdr->SizeOfStackCommit, 8, 0);
+            integer_to_array (section_alignment << 8, opthdr->SizeOfHeapReserved, 8, 0);
+            integer_to_array (0x1000, opthdr->SizeOfHeapCommit, 8, 0);
+        
+        } else {
+        
+            uint64_t ibss_addr = bss_section->rva;
+            uint64_t ibss_size = bss_section->total_size;
+            
+            uint64_t stack_addr = ibss_addr + ibss_size;
+            uint64_t stack_size = ALIGN (stack_addr, section_alignment);
+            
+            integer_to_array (section_alignment << 9, opthdr->SizeOfStackReserved, 8, 0);
+            integer_to_array (ALIGN (stack_addr % 16 + stack_size, section_alignment), opthdr->SizeOfStackCommit, 8, 0);
+            integer_to_array (section_alignment << 8, opthdr->SizeOfHeapReserved, 8, 0);
+            integer_to_array (ALIGN (stack_addr % 16 + stack_size, section_alignment), opthdr->SizeOfHeapCommit, 8, 0);
         
         }
     
@@ -2288,7 +2556,7 @@ static void import_generate_import (const char *import_name, short ordinal_hint,
     part = section_part_new (section, of);
     subsection_append_section_part (subsection, part);
     
-    part->content = xmalloc (part->content_size = 4);
+    part->content = xmalloc (part->content_size = (state->format == LD_FORMAT_AMD64_PE ? 8 : 4));
     part->reloc_cnt = 1;
     part->reloc_arr = xmalloc (part->reloc_cnt * sizeof (*part->reloc_arr));
     
@@ -2303,7 +2571,7 @@ static void import_generate_import (const char *import_name, short ordinal_hint,
     part = section_part_new (section, of);
     subsection_append_section_part (subsection, part);
     
-    part->content = xmalloc (part->content_size = 4);
+    part->content = xmalloc (part->content_size = (state->format == LD_FORMAT_AMD64_PE ? 8 : 4));
     
     symbol->name = xstrdup (".idata$5");
     symbol->value = 0;
@@ -2394,8 +2662,13 @@ static void import_generate_import (const char *import_name, short ordinal_hint,
         relocs = part->reloc_arr;
         
         relocs[0].symbol = &of->symbol_arr[0];
-        relocs[0].howto = &reloc_howtos[RELOC_TYPE_32];
         relocs[0].offset = 2;
+        
+        if (state->format == LD_FORMAT_AMD64_PE) {
+            relocs[0].howto = &reloc_howtos[RELOC_TYPE_PC32];
+        } else {
+            relocs[0].howto = &reloc_howtos[RELOC_TYPE_32];
+        }
     
     }
     
@@ -2526,13 +2799,13 @@ static void import_generate_end (void) {
     part = section_part_new (section, of);
     subsection_append_section_part (subsection, part);
     
-    part->content = xmalloc (part->content_size = 4);
+    part->content = xmalloc (part->content_size = (state->format == LD_FORMAT_AMD64_PE ? 8 : 4));
     subsection = subsection_find_or_make (section, "5");
     
     part = section_part_new (section, of);
     subsection_append_section_part (subsection, part);
     
-    part->content = xmalloc (part->content_size = 4);
+    part->content = xmalloc (part->content_size = (state->format == LD_FORMAT_AMD64_PE ? 8 : 4));
 
 }
 
@@ -2556,7 +2829,7 @@ void read_pe_import_library (const char *filename, unsigned char *data) {
     const char *import_name;
     const char *dll_name;
     
-    if (state->format != LD_FORMAT_I386_PE) {
+    if (state->format != LD_FORMAT_I386_PE && state->format != LD_FORMAT_AMD64_PE) {
         return;
     }
     

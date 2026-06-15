@@ -42,7 +42,7 @@ struct symbol_table_entry {
 
 };
 
-static void translate_relocation (struct reloc_entry *reloc, struct coff_relocation_entry *input, struct section_part *part) {
+static void translate_relocation32 (struct reloc_entry *reloc, struct coff_relocation_entry *input, struct section_part *part) {
 
     uint16_t type;
     
@@ -81,6 +81,78 @@ static void translate_relocation (struct reloc_entry *reloc, struct coff_relocat
         case IMAGE_REL_I386_REL32:
         
             reloc->howto = &reloc_howtos[RELOC_TYPE_PC32];
+            break;
+        
+        default:
+        
+            /* There is no point in continuing, the object is broken. */
+            report_at (program_name, 0, REPORT_FATAL_ERROR, "invalid relocation type 0x%04hx (origin object '%s')", array_to_integer (input->Type, 2, 0), part->of->filename);
+            exit (EXIT_FAILURE);
+    
+    }
+    
+    if (reloc->symbol->section_number == IMAGE_SYM_CLASS_STATIC) {
+        reloc->n_type = reloc->symbol->section_number;
+    }
+
+}
+
+static void translate_relocation64 (struct reloc_entry *reloc, struct coff_relocation_entry *input, struct section_part *part) {
+
+    uint16_t type;
+    
+    reloc->symbol = part->of->symbol_arr + array_to_integer (input->SymbolTableIndex, 4, 0);
+    reloc->offset = array_to_integer (input->VirtualAddress, 4, 0);
+    
+    type = array_to_integer (input->Type, 2, 0);
+    
+    switch (type) {
+    
+        case IMAGE_REL_AMD64_ABSOLUTE:
+        
+            reloc->howto = &reloc_howtos[RELOC_TYPE_IGNORED];
+            break;
+        
+        case IMAGE_REL_AMD64_ADDR64:
+        
+            reloc->howto = &reloc_howtos[RELOC_TYPE_64];
+            break;
+        
+        case IMAGE_REL_AMD64_ADDR32:
+        
+            reloc->howto = &reloc_howtos[RELOC_TYPE_32];
+            break;
+        
+        case IMAGE_REL_AMD64_ADDR32NB:
+        
+            reloc->howto = &reloc_howtos[RELOC_TYPE_32_NO_BASE];
+            break;
+        
+        case IMAGE_REL_AMD64_REL32:
+        
+            reloc->howto = &reloc_howtos[RELOC_TYPE_PC32];
+            break;
+        
+        case IMAGE_REL_AMD64_REL32_1:       case IMAGE_REL_AMD64_REL32_2:       case IMAGE_REL_AMD64_REL32_3:
+        case IMAGE_REL_AMD64_REL32_4:       case IMAGE_REL_AMD64_REL32_5:
+        
+            reloc->howto = &reloc_howtos[RELOC_TYPE_PC32];
+            
+            {
+            
+                unsigned long field = array_to_integer (part->content + reloc->offset, 4, 0);
+                field -= array_to_integer (input->Type, 2, 0) - IMAGE_REL_AMD64_REL32;
+                
+                integer_to_array (field, part->content + reloc->offset, 4, 0);
+            
+            }
+            
+            break;
+        
+        case IMAGE_REL_AMD64_SECTION:   case IMAGE_REL_AMD64_SECREL:    case IMAGE_REL_AMD64_SECREL7:   case IMAGE_REL_AMD64_TOKEN:
+        case IMAGE_REL_AMD64_SREL32:    case IMAGE_REL_AMD64_PAIR:      case IMAGE_REL_AMD64_SSPAN32:
+        
+            report_at (program_name, 0, REPORT_INTERNAL_ERROR, "+++relocation type 0x%04hx not supported yet", array_to_integer (input->Type, 2, 0));
             break;
         
         default:
@@ -281,7 +353,7 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
             *p++ = '\0';
         }
         
-        if (state->format == LD_FORMAT_I386_PE && strcmp (section_name, ".drectve") == 0) {
+        if ((state->format == LD_FORMAT_I386_PE || state->format == LD_FORMAT_AMD64_PE) && strcmp (section_name, ".drectve") == 0) {
         
             pe_interpret_dot_drectve_section (/*filename, data, data_size, */data + array_to_integer (section_hdr->PointerToRawData, 4, 0), array_to_integer (section_hdr->SizeOfRawData, 4, 0));
             
@@ -357,7 +429,12 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
             for (j = 0; j < no_relocs; j++) {
             
                 reloc_info = (struct coff_relocation_entry *) (pos + (sizeof (*reloc_info) * j));
-                translate_relocation (part->reloc_arr + j, reloc_info, part);
+                
+                if (data[0] == 0x64 && data[1] == 0x86) {
+                    translate_relocation64 (part->reloc_arr + j, reloc_info, part);
+                } else {
+                    translate_relocation32 (part->reloc_arr + j, reloc_info, part);
+                }
             
             }
         

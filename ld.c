@@ -89,7 +89,7 @@ static int read_object_file (const char *filename, unsigned char *data, unsigned
     
     }
     
-    if (data[0] == 0x4C && data[1] == 0x01) {
+    if ((data[0] == 0x4C && data[1] == 0x01) || (data[0] == 0x64 && data[1] == 0x86)) {
     
         read_coff_object (filename, data, data_size);
         return 0;
@@ -390,7 +390,7 @@ static void read_archive (const char *filename, unsigned char *data) {
     
     }
     
-    if (state->format == LD_FORMAT_I386_PE) {
+    if (state->format == LD_FORMAT_AMD64_PE || state->format == LD_FORMAT_I386_PE) {
     
         for (i = 0; i < num_symbols && (!start_header_object_offset || !end_header_object_offset); i++) {
         
@@ -437,7 +437,7 @@ static void read_archive (const char *filename, unsigned char *data) {
     
     }
     
-    if (state->format == LD_FORMAT_I386_PE) {
+    if (state->format == LD_FORMAT_AMD64_PE || state->format == LD_FORMAT_I386_PE) {
     
         if (end_header_object_offset) {
             read_archive_memeber (data + end_header_object_offset, filename);
@@ -529,7 +529,7 @@ int main (int argc, char **argv) {
     
         if (state->format == LD_FORMAT_COM) {
             state->base_address = 0x00000100;
-        } else if (state->format == LD_FORMAT_I386_PE) {
+        } else if (state->format == LD_FORMAT_AMD64_PE || state->format == LD_FORMAT_I386_PE) {
         
             if (state->create_shared_library) {
                 state->base_address = 0x10000000;
@@ -562,7 +562,7 @@ int main (int argc, char **argv) {
         dx_before_link ();
     } else if (state->format == LD_FORMAT_I386_ELKS) {
         elks_before_link ();
-    } else if (state->format == LD_FORMAT_I386_PE) {
+    } else if (state->format == LD_FORMAT_AMD64_PE || state->format == LD_FORMAT_I386_PE) {
         pe_before_link ();
     } else if (state->format == LD_FORMAT_AARCH64_MACHO || state->format == LD_FORMAT_AMD64_MACHO) {
         macho_before_link ();
@@ -629,10 +629,15 @@ int main (int argc, char **argv) {
         elks_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_ELF) {
         elf32_write (state->output_filename);
-    } else if (state->format == LD_FORMAT_I386_PE) {
+    } else if (state->format == LD_FORMAT_AMD64_PE || state->format == LD_FORMAT_I386_PE) {
     
         pe_after_link ();
-        pe_write (state->output_filename);
+        
+        if (state->format == LD_FORMAT_AMD64_PE) {
+            pe64_write (state->output_filename);
+        } else {
+            pe32_write (state->output_filename);
+        }
     
     } else if (state->format == LD_FORMAT_I386_COFF) {
     

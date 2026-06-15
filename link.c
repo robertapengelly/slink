@@ -322,7 +322,7 @@ static int has_dgroup = 0;
 
 static unsigned long align_section_if_needed (unsigned long value) {
 
-    if (state->format == LD_FORMAT_I386_PE) {
+    if (state->format == LD_FORMAT_I386_PE || state->format == LD_FORMAT_AMD64_PE) {
         return pe_align_to_file_alignment (value);
     }
     
@@ -539,7 +539,7 @@ static void calculate_section_sizes_and_rvas (void) {
     
     uint64_t rva = 0;
     
-    if (state->format == LD_FORMAT_I386_PE) {
+    if (state->format == LD_FORMAT_AMD64_PE || state->format == LD_FORMAT_I386_PE) {
         rva = pe_get_first_section_rva ();
     } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
         rva = macho_get_first_section_rva ();
@@ -970,7 +970,7 @@ static void calculate_entry_point (void) {
             
             }
         
-        } else if (state->format == LD_FORMAT_I386_PE) {
+        } else if (state->format == LD_FORMAT_I386_PE || state->format == LD_FORMAT_AMD64_PE) {
         
             state->entry_symbol_name = xstrdup ("_mainCRTStartup");
             

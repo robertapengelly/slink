@@ -60,14 +60,18 @@ struct pe_header {
 
 };
 
+#define     IMAGE_FILE_MACHINE_UNKNOWN                      0x0000
+#define     IMAGE_FILE_MACHINE_AMD64                        0x8664
 #define     IMAGE_FILE_MACHINE_I386                         0x014C
 
 #define     IMAGE_FILE_RELOCS_STRIPPED                      0x0001
 #define     IMAGE_FILE_EXECUTABLE_IMAGE                     0x0002
 #define     IMAGE_FILE_LINE_NUMS_STRIPPED                   0x0004
 #define     IMAGE_FILE_LOCAL_SYMS_STRIPPED                  0x0008
+#define     IMAGE_FILE_LARGE_ADDRESS_AWARE                  0x0020
 #define     IMAGE_FILE_32BIT_MACHINE                        0x0100
 #define     IMAGE_FILE_DEBUG_STRIPPED                       0x0200
+#define     IMAGE_FILE_DLL                                  0x2000
 
 struct pe_optional_header {
 
@@ -115,7 +119,48 @@ struct pe_optional_header {
 
 };
 
+struct pe_optional_header_plus {
+
+    unsigned char Magic[2];
+    
+    unsigned char MajorLinkerVersion;
+    unsigned char MinorLinkerVersion;
+    
+    unsigned char SizeOfCode[4];
+    unsigned char SizeOfInitializedData[4];
+    unsigned char SizeOfUninitializedData[4];
+    unsigned char AddressOfEntryPoint[4];
+    
+    unsigned char BaseOfCode[4];
+    unsigned char ImageBase[8];
+    
+    unsigned char SectionAlignment[4];
+    unsigned char FileAlignment[4];
+    unsigned char MajorOperatingSystemVersion[2];
+    unsigned char MinorOperatingSystemVersion[2];
+    unsigned char MajorImageVersion[2];
+    unsigned char MinorImageVersion[2];
+    unsigned char MajorSubsystemVersion[2];
+    unsigned char MinorSubsystemVersion[2];
+    unsigned char Win32VersionValue[4];
+    unsigned char SizeOfImage[4];
+    unsigned char SizeOfHeaders[4];
+    unsigned char Checksum[4];
+    unsigned char Subsystem[2];
+    unsigned char DllCharacteristics[2];
+    
+    unsigned char SizeOfStackReserved[8];
+    unsigned char SizeOfStackCommit[8];
+    unsigned char SizeOfHeapReserved[8];
+    unsigned char SizeOfHeapCommit[8];
+    
+    unsigned char LoaderFlags[4];
+    unsigned char NumberOfRvaAndSizes[4];
+
+};
+
 #define     IMAGE_FILE_MAGIC_I386                           0x010B
+#define     IMAGE_FILE_MAGIC_AMD64                          0x020B
 
 struct pe_section_table_entry {
 
@@ -236,10 +281,12 @@ void pe_after_link (void);
 void pe_before_link (void);
 void pe_print_help (void);
 
-void pe_write (const char *filename);
-void pe_use_option (const char *cmd_arg, int idx, const char *optarg);
+void pe32_write (const char *filename);
+void pe64_write (const char *filename);
 
+void pe_use_option (const char *cmd_arg, int idx, const char *optarg);
 void pe_archive_end (void);
+
 void read_pe_import_library (const char *filename, unsigned char *data);
 
 #endif      /* _PE_H */

@@ -119,7 +119,8 @@ static void print_usage (void) {
         fprintf (stderr, "                                              elf-amd64, elf-i386\n");
         fprintf (stderr, "                                              elks-ia16, elks-i386\n");
         fprintf (stderr, "                                              macho-aarch64, macho-amd64\n");
-        fprintf (stderr, "                                              pe-i386, binary, msdos\n");
+        fprintf (stderr, "                                              pe-i386, pe-amd64\n");
+        fprintf (stderr, "                                              binary, msdos\n");
         fprintf (stderr, "    --image-base <address>            Set base address of the executable.\n");
         
         fprintf (stderr, "\n");
@@ -325,6 +326,30 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
                 if (state->emulation == LD_EMULATION_NONE) {
                     state->emulation = LD_EMULATION_I386_PE;
                 }
+                
+                break;
+            
+            }
+            
+            if (xstrcasecmp (optarg, "pe-amd64") == 0) {
+            
+                state->format = LD_FORMAT_AMD64_PE;
+                
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_I386_PE;
+                }
+                
+                break;
+            
+            }
+            
+            if (xstrcasecmp (optarg, "elf-amd64") == 0) {
+            
+                state->format = LD_FORMAT_AMD64_PE;
+                
+                /*if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_I386_COFF;
+                }*/
                 
                 break;
             
