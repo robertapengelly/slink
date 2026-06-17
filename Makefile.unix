@@ -7,7 +7,7 @@ VPATH               :=  $(SRCDIR)
 CC                  :=  gcc
 CFLAGS              :=  -D_FILE_OFFSET_BITS=64 -O2 -Wall -Werror -Wextra -ansi -pedantic -std=c90
 
-CSRC                :=  aout.c coff.c dx.c elf.c elks.c hashtab.c ld.c lib.c link.c ll.c macho.c map.c mz.c omf.c pe.c report.c section.c symbol.c vector.c write7x.c
+CSRC                :=  aout.c axe.c coff.c dx.c elf.c elks.c hashtab.c ld.c lib.c link.c ll.c macho.c map.c mz.c omf.c pe.c report.c section.c symbol.c vector.c write7x.c
 
 ifeq ($(OS), Windows_NT)
 all: slink.exe

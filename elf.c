@@ -1295,8 +1295,8 @@ uint64_t elf_get_first_section_rva (void) {
 }
 
 #define     PT_LOAD                     1
-#define     EM_I386                     3
 
+#define     EM_I386                     3
 #define     EM_AMD64                    62
 #define     EM_AARCH64                  183
 

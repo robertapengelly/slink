@@ -60,13 +60,15 @@ struct ld_state {
 #define     LD_FORMAT_I386_COFF         (LD_TARGET_MACHINE_I386     | 0x08)
 #define     LD_FORMAT_I386_PE           (LD_TARGET_MACHINE_I386     | 0x09)
 #define     LD_FORMAT_I386_ELF          (LD_TARGET_MACHINE_I386     | 0x10)
+#define     LD_FORMAT_I386_AXE          (LD_TARGET_MACHINE_I386     | 0x11)
 
-#define     LD_FORMAT_AMD64_MACHO       (LD_TARGET_MACHINE_AMD64    | 0x11)
-#define     LD_FORMAT_AMD64_ELF         (LD_TARGET_MACHINE_AMD64    | 0x12)
-#define     LD_FORMAT_AMD64_PE          (LD_TARGET_MACHINE_AMD64    | 0x13)
+#define     LD_FORMAT_AMD64_MACHO       (LD_TARGET_MACHINE_AMD64    | 0x12)
+#define     LD_FORMAT_AMD64_ELF         (LD_TARGET_MACHINE_AMD64    | 0x13)
+#define     LD_FORMAT_AMD64_PE          (LD_TARGET_MACHINE_AMD64    | 0x14)
+#define     LD_FORMAT_AMD64_AXE         (LD_TARGET_MACHINE_AMD64    | 0x15)
 
-#define     LD_FORMAT_AARCH64_MACHO     (LD_TARGET_MACHINE_AARCH64  | 0x14)
-#define     LD_FORMAT_AARCH64_ELF       (LD_TARGET_MACHINE_AARCH64  | 0x15)
+#define     LD_FORMAT_AARCH64_MACHO     (LD_TARGET_MACHINE_AARCH64  | 0x16)
+#define     LD_FORMAT_AARCH64_ELF       (LD_TARGET_MACHINE_AARCH64  | 0x17)
 
 
 extern struct ld_state *state;

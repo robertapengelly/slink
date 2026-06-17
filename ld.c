@@ -7,6 +7,7 @@
 
 #include    "aout.h"
 #include    "ar.h"
+#include    "axe.h"
 #include    "coff.h"
 #include    "dx.h"
 #include    "elf.h"
@@ -502,7 +503,7 @@ int main (int argc, char **argv) {
     
     }
     
-    if (state->format == LD_FORMAT_I386_AOUT || state->format == LD_FORMAT_I386_DX || state->format == LD_FORMAT_IA16_DX || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_MZ) {
+    if (state->format == LD_FORMAT_I386_AOUT || state->format == LD_FORMAT_AMD64_AXE || state->format == LD_FORMAT_I386_AXE  || state->format == LD_FORMAT_I386_DX || state->format == LD_FORMAT_IA16_DX || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_MZ) {
     
         section_find_or_make (".text");
         section_find_or_make (".data");
@@ -556,6 +557,8 @@ int main (int argc, char **argv) {
     
     if (state->format == LD_FORMAT_I386_AOUT) {
         aout_before_link ();
+    } else if (state->format == LD_FORMAT_AMD64_AXE || state->format == LD_FORMAT_I386_AXE ) {
+        axe_before_link ();
     } else if (state->format == LD_FORMAT_I386_COFF) {
         coff_before_link ();
     } else if (state->format == LD_FORMAT_I386_DX) {
@@ -623,6 +626,10 @@ int main (int argc, char **argv) {
         mz_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_AOUT) {
         aout_write (state->output_filename);
+    } else if (state->format == LD_FORMAT_AMD64_AXE) {
+        axe_write64 (state->output_filename);
+    } else if (state->format == LD_FORMAT_I386_AXE) {
+        axe_write32 (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_DX || state->format == LD_FORMAT_IA16_DX) {
         dx_write (state->output_filename);
     } else if (state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS) {
