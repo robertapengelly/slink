@@ -970,7 +970,18 @@ static void calculate_entry_point (void) {
             
             }
         
-        } else if (state->format == LD_FORMAT_I386_PE || state->format == LD_FORMAT_AMD64_PE) {
+        } else if (state->format == LD_FORMAT_AMD64_PE) {
+        
+            state->entry_symbol_name = xstrdup ("mainCRTStartup");
+            
+            if ((symbol = symbol_find (state->entry_symbol_name))) {
+            
+                state->entry_point = symbol_get_value_no_base (symbol);
+                return;
+            
+            }
+        
+        } else if (state->format == LD_FORMAT_I386_PE) {
         
             state->entry_symbol_name = xstrdup ("_mainCRTStartup");
             
