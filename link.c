@@ -959,7 +959,29 @@ static void calculate_entry_point (void) {
     
     if (!state->entry_symbol_name) {
     
-        if (state->format == LD_FORMAT_I386_AOUT || state->format == LD_FORMAT_I386_ELKS || state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
+        if (state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_AOUT || state->format == LD_FORMAT_I386_AXE || state->format == LD_FORMAT_I386_ELKS) {
+        
+            state->entry_symbol_name = xstrdup ("_start");
+            
+            if ((symbol = symbol_find (state->entry_symbol_name))) {
+            
+                state->entry_point = symbol_get_value_no_base (symbol);
+                return;
+            
+            }
+        
+        } else if (state->format == LD_FORMAT_AMD64_AXE || state->format == LD_FORMAT_AMD64_ELF) {
+        
+            state->entry_symbol_name = xstrdup ("_start");
+            
+            if ((symbol = symbol_find (state->entry_symbol_name))) {
+            
+                state->entry_point = symbol_get_value_no_base (symbol);
+                return;
+            
+            }
+        
+        } else if (state->format == LD_FORMAT_AARCH64_MACHO || state->format == LD_FORMAT_AMD64_MACHO) {
         
             state->entry_symbol_name = xstrdup ("_start");
             
