@@ -959,7 +959,7 @@ static void calculate_entry_point (void) {
     
     if (!state->entry_symbol_name) {
     
-        if (state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_AOUT || state->format == LD_FORMAT_I386_AXE || state->format == LD_FORMAT_I386_ELKS) {
+        if (state->format == LD_FORMAT_IA16_ELKS || state->format == LD_FORMAT_I386_AOUT || state->format == LD_FORMAT_I386_AXE || state->format == LD_FORMAT_I386_ELF || state->format == LD_FORMAT_I386_ELKS) {
         
             state->entry_symbol_name = xstrdup ("_start");
             
