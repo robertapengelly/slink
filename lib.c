@@ -8,6 +8,7 @@
 #include    <stdlib.h>
 #include    <string.h>
 
+#include    "axe.h"
 #include    "ld.h"
 #include    "lib.h"
 #include    "macho.h"
@@ -33,6 +34,7 @@ static struct options_with_use emulation_table[] = {
     {   0,                      0,                      0                   },
     {   0,                      0,                      0                   },
     {   &pe_print_help,         &pe_check_option,       &pe_use_option      },
+    {   &axe_print_help,        &axe_check_option,      &axe_use_option     },
     {   &macho_print_help,      &macho_check_option,    &macho_use_option   }
 
 };
@@ -323,9 +325,9 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
                 state->format = LD_FORMAT_I386_AXE;
                 
-                /*if (state->emulation == LD_EMULATION_NONE) {
-                    state->emulation = LD_EMULATION_I386_AOUT;
-                }*/
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_AXE;
+                }
                 
                 break;
             
@@ -335,9 +337,9 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
                 state->format = LD_FORMAT_AMD64_AXE;
                 
-                /*if (state->emulation == LD_EMULATION_NONE) {
-                    state->emulation = LD_EMULATION_I386_AOUT;
-                }*/
+                if (state->emulation == LD_EMULATION_NONE) {
+                    state->emulation = LD_EMULATION_AXE;
+                }
                 
                 break;
             
@@ -363,6 +365,7 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
                     state->emulation = LD_EMULATION_I386_PE;
                 }
                 
+                state->leading_underscore = 0;
                 break;
             
             }
@@ -707,6 +710,8 @@ void parse_args (int argc, char **argv, int optind) {
         exit (EXIT_SUCCESS);
     
     }
+    
+    state->leading_underscore = 1;
     
     while (optind < argc) {
     

@@ -66,6 +66,11 @@ struct axe_nlist {
 };
 
 #define     AXE_TYPE                      0x1e
+int axe_check_option (const char *cmd_arg, int argc, char **argv, int *optind, const char **optarg);
+
+void axe_print_help (void);
+void axe_use_option (const char *cmd_arg, int idx, const char *optarg);
+
 void axe_before_link (void);
 
 void axe_write32 (const char *filename);

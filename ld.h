@@ -25,6 +25,7 @@ struct ld_state {
     unsigned long size_of_headers;
     
     int emulation, generate_symbols_table, impure;
+    int leading_underscore;
 
 };
 
@@ -44,7 +45,8 @@ struct ld_state {
 #define     LD_EMULATION_I386_DX        0x05
 #define     LD_EMULATION_I386_PE        0x06
 
-#define     LD_EMULATION_MACHO          0x07
+#define     LD_EMULATION_AXE            0x07
+#define     LD_EMULATION_MACHO          0x08
 
 
 #define     LD_FORMAT_COM               0x00
