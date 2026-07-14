@@ -370,18 +370,6 @@ static void use_option (const char *cmd_arg, int idx, const char *optarg) {
             
             }
             
-            if (xstrcasecmp (optarg, "elf-amd64") == 0) {
-            
-                state->format = LD_FORMAT_AMD64_PE;
-                
-                /*if (state->emulation == LD_EMULATION_NONE) {
-                    state->emulation = LD_EMULATION_I386_COFF;
-                }*/
-                
-                break;
-            
-            }
-            
             if (xstrcasecmp (optarg, "coff-i386") == 0) {
             
                 state->format = LD_FORMAT_I386_COFF;

@@ -468,8 +468,8 @@ static void check_unresolved (void) {
     struct object_file *of;
     struct symbol *symbol;
     
-    unsigned long i;
     unsigned long unresolved = 0;
+    unsigned long i;
     
     for (of = all_object_files; of; of = of->next) {
     

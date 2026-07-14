@@ -569,7 +569,7 @@ void read_coff_object (const char *filename, unsigned char *data, unsigned long 
             
             }
             
-            i += coff_symbol->NumberOfAuxSymbols[1];
+            i += coff_symbol->NumberOfAuxSymbols[0];
         
         }
     
