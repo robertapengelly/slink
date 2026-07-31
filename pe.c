@@ -292,8 +292,8 @@ unsigned char dos_stub[] = {
     0x74,   0x20,   0x62,   0x65,   0x20,   0x72,   0x75,   0x6E,
     0x20,   0x69,   0x6E,   0x20,   0x44,   0x4F,   0x53,   0x20,
     
-    0x6D,   0x6F,   0x64,   0x65,   0x2E,   0x0D,   0x0D,   0x0A,
-    0x24,   0x00,   0x00,   0x00,   0x00,   0x00,   0x00,   0x00
+    0x6D,   0x6F,   0x64,   0x65,   0x2E,   0x0D,   0x0A,   0x24,
+    0x00,   0x00,   0x00,   0x00,   0x00,   0x00,   0x00,   0x00
 
 };
 
@@ -2116,29 +2116,40 @@ void pe32_write (const char *filename) {
     
     {
     
+        unsigned long stack_reserve = section_alignment << 9;
+        unsigned long stack_commit = 0x1000;
+        
+        unsigned long heap_reserve = section_alignment << 8;
+        unsigned long heap_commit = 0x1000;
+        
         struct section *bss_section;
         
-        if (!(bss_section = section_find (".bss"))) {
+        if ((bss_section = section_find (".bss"))) {
         
-            write741_to_byte_array (opthdr->SizeOfStackReserved, section_alignment << 9);
-            write741_to_byte_array (opthdr->SizeOfStackCommit, 0x1000);
-            write741_to_byte_array (opthdr->SizeOfHeapReserved, section_alignment << 8);
-            write741_to_byte_array (opthdr->SizeOfHeapCommit, 0x1000);
-        
-        } else {
-        
-            unsigned long ibss_addr = bss_section->rva;
-            unsigned long ibss_size = bss_section->total_size;
+            unsigned long image_data_end = ALIGN (bss_section->rva + bss_section->total_size, section_alignment);
+                    
+            if (image_data_end > stack_commit) {
+                stack_commit = image_data_end;
+            }
             
-            unsigned long stack_addr = ibss_addr + ibss_size;
-            unsigned long stack_size = ALIGN (stack_addr, section_alignment);
+            if (image_data_end > heap_commit) {
+                heap_commit = image_data_end;
+            }
             
-            write741_to_byte_array (opthdr->SizeOfStackReserved, section_alignment << 9);
-            write741_to_byte_array (opthdr->SizeOfStackCommit, ALIGN (stack_addr % 16 + stack_size, section_alignment));
-            write741_to_byte_array (opthdr->SizeOfHeapReserved, section_alignment << 8);
-            write741_to_byte_array (opthdr->SizeOfHeapCommit, ALIGN (stack_addr % 16 + stack_size, section_alignment));
+            if (stack_commit > stack_reserve) {
+                stack_reserve = stack_commit;
+            }
+            
+            if (heap_commit > heap_reserve) {
+                heap_reserve = heap_commit;
+            }
         
         }
+        
+        write741_to_byte_array (opthdr->SizeOfStackReserved, stack_reserve);
+        write741_to_byte_array (opthdr->SizeOfStackCommit, stack_commit);
+        write741_to_byte_array (opthdr->SizeOfHeapReserved, heap_reserve);
+        write741_to_byte_array (opthdr->SizeOfHeapCommit, heap_commit);
     
     }
     
@@ -2373,29 +2384,40 @@ void pe64_write (const char *filename) {
     
     {
     
+        unsigned long stack_reserve = section_alignment << 9;
+        unsigned long stack_commit = 0x1000;
+        
+        unsigned long heap_reserve = section_alignment << 8;
+        unsigned long heap_commit = 0x1000;
+        
         struct section *bss_section;
         
-        if (!(bss_section = section_find (".bss"))) {
+        if ((bss_section = section_find (".bss"))) {
         
-            integer_to_array (section_alignment << 9, opthdr->SizeOfStackReserved, 8, 0);
-            integer_to_array (0x1000, opthdr->SizeOfStackCommit, 8, 0);
-            integer_to_array (section_alignment << 8, opthdr->SizeOfHeapReserved, 8, 0);
-            integer_to_array (0x1000, opthdr->SizeOfHeapCommit, 8, 0);
-        
-        } else {
-        
-            uint64_t ibss_addr = bss_section->rva;
-            uint64_t ibss_size = bss_section->total_size;
+            unsigned long image_data_end = ALIGN (bss_section->rva + bss_section->total_size, section_alignment);
+                    
+            if (image_data_end > stack_commit) {
+                stack_commit = image_data_end;
+            }
             
-            uint64_t stack_addr = ibss_addr + ibss_size;
-            uint64_t stack_size = ALIGN (stack_addr, section_alignment);
+            if (image_data_end > heap_commit) {
+                heap_commit = image_data_end;
+            }
             
-            integer_to_array (section_alignment << 9, opthdr->SizeOfStackReserved, 8, 0);
-            integer_to_array (ALIGN (stack_addr % 16 + stack_size, section_alignment), opthdr->SizeOfStackCommit, 8, 0);
-            integer_to_array (section_alignment << 8, opthdr->SizeOfHeapReserved, 8, 0);
-            integer_to_array (ALIGN (stack_addr % 16 + stack_size, section_alignment), opthdr->SizeOfHeapCommit, 8, 0);
+            if (stack_commit > stack_reserve) {
+                stack_reserve = stack_commit;
+            }
+            
+            if (heap_commit > heap_reserve) {
+                heap_reserve = heap_commit;
+            }
         
         }
+        
+        integer_to_array (stack_reserve, opthdr->SizeOfStackReserved, 8, 0);
+        integer_to_array (stack_commit, opthdr->SizeOfStackCommit, 8, 0);
+        integer_to_array (heap_reserve, opthdr->SizeOfHeapReserved, 8, 0);
+        integer_to_array (heap_commit, opthdr->SizeOfHeapCommit, 8, 0);
     
     }
     
