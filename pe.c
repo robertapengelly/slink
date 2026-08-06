@@ -1000,12 +1000,29 @@ struct symbol_info *create_symbol_list (struct export_name *export_name, unsigne
     for (i = 0, j = 0; i < num_names; i++, j++) {
     
         symbol_info = xmalloc (sizeof (*symbol_info));
-        symbol_info->name = xmalloc (7 + strlen (export_name[i].name) + 1);
+        
+        if (export_name[i].real_name) {
+            symbol_info->name = xmalloc (7 + strlen (export_name[i].real_name) + 1);
+        } else {
+            symbol_info->name = xmalloc (7 + strlen (export_name[i].name) + 1);
+        }
         
         if (state->leading_underscore) {
-            sprintf (symbol_info->name, "__imp__%s", export_name[i].name);
+        
+            if (export_name[i].real_name) {
+                sprintf (symbol_info->name, "__imp__%s", export_name[i].real_name);
+            } else {
+                sprintf (symbol_info->name, "__imp__%s", export_name[i].name);
+            }
+        
         } else {
-            sprintf (symbol_info->name, "__imp_%s", export_name[i].name);
+        
+            if (export_name[i].real_name) {
+                sprintf (symbol_info->name, "__imp_%s", export_name[i].real_name);
+            } else {
+                sprintf (symbol_info->name, "__imp_%s", export_name[i].name);
+            }
+        
         }
         
         symbol_info->name_length = strlen (symbol_info->name);
@@ -1598,9 +1615,21 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
         offsets[4 + i] = offset2;
         
         if (state->leading_underscore) {
-            offset2 += write_file_header (outfile, header_name, bHeaderName, sizeof (import_hdr) + 1 + strlen (export_names[i].name) + 1 + module_name_length + 1, 0);
+        
+            if (export_names[i].real_name) {
+                offset2 += write_file_header (outfile, header_name, bHeaderName, sizeof (import_hdr) + 1 + strlen (export_names[i].real_name) + 1 + module_name_length + 1, 0);
+            } else {
+                offset2 += write_file_header (outfile, header_name, bHeaderName, sizeof (import_hdr) + 1 + strlen (export_names[i].name) + 1 + module_name_length + 1, 0);
+            }
+        
         } else {
-            offset2 += write_file_header (outfile, header_name, bHeaderName, sizeof (import_hdr) + strlen (export_names[i].name) + 1 + module_name_length + 1, 0);
+        
+            if (export_names[i].real_name) {
+                offset2 += write_file_header (outfile, header_name, bHeaderName, sizeof (import_hdr) + strlen (export_names[i].real_name) + 1 + module_name_length + 1, 0);
+            } else {
+                offset2 += write_file_header (outfile, header_name, bHeaderName, sizeof (import_hdr) + strlen (export_names[i].name) + 1 + module_name_length + 1, 0);
+            }
+        
         }
         
         memset (&import_hdr, 0, sizeof (import_hdr));
@@ -1615,9 +1644,21 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
         }
         
         if (state->leading_underscore) {
-            integer_to_array (1 + strlen (export_names[i].name) + 1 + module_name_length + 1, import_hdr.SizeOfData, 4, 0);
+        
+            if (export_names[i].real_name) {
+                integer_to_array (1 + strlen (export_names[i].real_name) + 1 + module_name_length + 1, import_hdr.SizeOfData, 4, 0);
+            } else {
+                integer_to_array (1 + strlen (export_names[i].name) + 1 + module_name_length + 1, import_hdr.SizeOfData, 4, 0);
+            }
+        
         } else {
-            integer_to_array (strlen (export_names[i].name) + 1 + module_name_length + 1, import_hdr.SizeOfData, 4, 0);
+        
+            if (export_names[i].real_name) {
+                integer_to_array (strlen (export_names[i].real_name) + 1 + module_name_length + 1, import_hdr.SizeOfData, 4, 0);
+            } else {
+                integer_to_array (strlen (export_names[i].name) + 1 + module_name_length + 1, import_hdr.SizeOfData, 4, 0);
+            }
+        
         }
         
         integer_to_array (ordinal_base + i, import_hdr.OrdinalHint, 2, 0);
@@ -1654,13 +1695,31 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
         
         if (state->leading_underscore) {
         
-            name = xmalloc (1 + strlen (export_names[i].name) + 1);
-            sprintf (name, "_%s", export_names[i].name);
+            if (export_names[i].real_name) {
+            
+                name = xmalloc (1 + strlen (export_names[i].real_name) + 1);
+                sprintf (name, "_%s", export_names[i].real_name);
+            
+            } else {
+            
+                name = xmalloc (1 + strlen (export_names[i].name) + 1);
+                sprintf (name, "_%s", export_names[i].name);
+            
+            }
         
         } else {
         
-            name = xmalloc (strlen (export_names[i].name) + 1);
-            sprintf (name, "%s", export_names[i].name);
+            if (export_names[i].real_name) {
+            
+                name = xmalloc (strlen (export_names[i].real_name) + 1);
+                sprintf (name, "%s", export_names[i].real_name);
+            
+            } else {
+            
+                name = xmalloc (strlen (export_names[i].name) + 1);
+                sprintf (name, "%s", export_names[i].name);
+            
+            }
         
         }
         
