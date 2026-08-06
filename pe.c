@@ -299,7 +299,7 @@ unsigned char dos_stub[] = {
 
 struct name_list {
 
-    char *name;
+    char *name, *real_name;
     int info;
     
     struct name_list *next;
@@ -320,9 +320,21 @@ static void export_symbol_callback (struct symbol *symbol) {
     name_list = xmalloc (sizeof (*name_list));
     
     if (state->leading_underscore && symbol->name[0] == '_') {
+    
         name_list->name = xstrdup (symbol->name + 1);
+        
+        if (symbol->real_name) {
+            name_list->real_name = xstrdup (symbol->real_name + 1);
+        }
+    
     } else {
+    
         name_list->name = xstrdup (symbol->name);
+        
+        if (symbol->real_name) {
+            name_list->real_name = xstrdup (symbol->real_name);
+        }
+    
     }
     
     name_list->info = (symbol->part->section->flags & SECTION_FLAG_CODE) ? 0 : 1;
@@ -333,10 +345,6 @@ static void export_symbol_callback (struct symbol *symbol) {
 
 }
 
-static char is_end_of_line[256] = {
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 /* '\0' and '\n' */
-};
-
 static void parse_def (const char *ifile) {
 
     char *line, *line_end, *real_line, *caret;
@@ -345,11 +353,13 @@ static void parse_def (const char *ifile) {
     unsigned long new_line_number = 1;
     unsigned long newlines;
     
+    char *symbol_name, *real_symbol_name;
     int has_exports = 0;
-    void *load_line_internal_data = NULL;
     
     struct symbol *symbol;
     FILE *fp;
+    
+    void *load_line_internal_data = NULL;
     
     if (!(fp = fopen (ifile, "r"))) {
     
@@ -366,22 +376,30 @@ static void parse_def (const char *ifile) {
         
         if (line < line_end) {
         
-            if (!isalnum ((int) *line) && *line != '_') {
+            if (!isalnum ((int) *caret) && *caret != '_') {
             
                 report_at (ifile, 0, REPORT_ERROR, "expected ident");
                 continue;
             
             }
             
-            while (!is_end_of_line[(int) *line]) {
-                line++;
+            symbol_name = caret;
+            
+            while (isalnum ((int) *caret) || *caret == '_') {
+                caret++;
             }
             
-            *line = '\0';
+            line = caret;
+            
+            if (isspace ((int) *line)) {
+                line = skip_whitespace (line + 1);
+            }
+            
+            *caret = '\0';
             
             if (!has_exports) {
             
-                if (strcmp (caret, "EXPORTS")) {
+                if (strcmp (symbol_name, "EXPORTS")) {
                 
                     report_at (ifile, 0, REPORT_ERROR, "invalid command");
                     continue;
@@ -393,9 +411,39 @@ static void parse_def (const char *ifile) {
             
             }
             
-            *line = '\0';
+            if (*line == '=') {
             
-            if ((symbol = symbol_find (caret))) {
+                real_symbol_name = symbol_name;
+                caret = skip_whitespace (line + 1);
+                
+                if (!isalnum ((int) *caret) && *caret != '_') {
+                
+                    report_at (ifile, 0, REPORT_ERROR, "expected ident");
+                    continue;
+                
+                }
+                
+                symbol_name = caret;
+                
+                while (isalnum ((int) *caret) || *caret == '_') {
+                    caret++;
+                }
+                
+                line = caret;
+                
+                if (isspace ((int) *line)) {
+                    line = skip_whitespace (line + 1);
+                }
+                
+                *caret = '\0';
+                
+                if ((symbol = symbol_find (symbol_name))) {
+                    symbol->real_name = xstrdup (real_symbol_name);
+                }
+            
+            }
+            
+            if ((symbol = symbol_find (symbol_name))) {
                 export_symbol_callback (symbol);
             }
         
@@ -866,6 +914,8 @@ enum export_type {
 struct export_name {
 
     char *name, *name_no_at;
+    char *real_name, *real_name_no_at;
+    
     enum export_type export_type;
 
 };
@@ -1673,6 +1723,8 @@ static void generate_edata (void) {
     struct reloc_entry *relocs;
     
     unsigned long ordinal_base = 1, i, num_names, name_table_size, name_table_offset;
+    unsigned long name_len;
+    
     char *name;
     
     for (name_list = export_name_list, num_names = 0, name_table_size = 0; name_list; name_list = name_list->next) {
@@ -1686,15 +1738,37 @@ static void generate_edata (void) {
         next_name_list = name_list->next;
         export_names[i].name = name_list->name;
         
+        if (name_list->real_name) {
+            export_names[i].real_name = name_list->real_name;
+        }
+        
         if (kill_at) {
         
             export_names[i].name_no_at = unat_name (export_names[i].name);
-            name_table_size += strlen (export_names[i].name_no_at) + 1;
+            name_len = strlen (export_names[i].name_no_at) + 1;
+            
+            if (name_list->real_name) {
+            
+                export_names[i].real_name_no_at = unat_name (export_names[i].real_name);
+                name_len = strlen (export_names[i].real_name_no_at) + 1;
+            
+            }
+            
+            name_table_size += name_len;
         
         } else {
         
             export_names[i].name_no_at = 0;
-            name_table_size += strlen (export_names[i].name) + 1;
+            name_len = strlen (export_names[i].name) + 1;
+            
+            if (name_list->real_name) {
+            
+                export_names[i].real_name_no_at = 0;
+                name_len = strlen (export_names[i].real_name) + 1;
+            
+            }
+            
+            name_table_size += name_len;
         
         }
         
@@ -1771,11 +1845,25 @@ static void generate_edata (void) {
         
             symbol->name = xmalloc (1 + strlen (export_names[i].name) + 1);
             sprintf (symbol->name, "_%s", export_names[i].name);
+            
+            if (export_names[i].real_name) {
+            
+                symbol->real_name = xmalloc (1 + strlen (export_names[i].real_name) + 1);
+                sprintf (symbol->real_name, "_%s", export_names[i].real_name);
+            
+            }
         
         } else {
         
             symbol->name = xmalloc (strlen (export_names[i].name) + 1);
             sprintf (symbol->name, "%s", export_names[i].name);
+            
+            if (export_names[i].real_name) {
+            
+                symbol->name = xmalloc (strlen (export_names[i].real_name) + 1);
+                sprintf (symbol->real_name, "%s", export_names[i].real_name);
+            
+            }
         
         }
         
@@ -1799,11 +1887,15 @@ static void generate_edata (void) {
         integer_to_array (name_table_offset, part->content + relocs[0].offset, 4, 0);
         relocs++;
         
-        integer_to_array (i, part->content + array_to_integer (ied->OrdinalTableRVA, 4, 0) + 2 * i, 4, 0);
+        integer_to_array (i, part->content + array_to_integer (ied->OrdinalTableRVA, 4, 0) + 2 * i, 2, 0);
         
-        name = kill_at ? export_names[i].name_no_at : export_names[i].name;
+        if (kill_at) {
+            name = export_names[i].real_name_no_at ? export_names[i].real_name_no_at : export_names[i].name_no_at;
+        } else {
+            name = export_names[i].real_name ? export_names[i].real_name : export_names[i].name;
+        }
+        
         strcpy ((char *) part->content + name_table_offset, name);
-        
         name_table_offset += strlen (name) + 1;
     
     }
@@ -1816,6 +1908,14 @@ static void generate_edata (void) {
         
         if (export_names[i].name_no_at) {
             free (export_names[i].name_no_at);
+        }
+        
+        if (export_names[i].real_name) {
+            free (export_names[i].real_name);
+        }
+        
+        if (export_names[i].real_name_no_at) {
+            free (export_names[i].real_name_no_at);
         }
     
     }
@@ -2056,10 +2156,12 @@ void pe32_write (const char *filename) {
         unsigned short characteristics = 0;
         
         characteristics |= IMAGE_FILE_EXECUTABLE_IMAGE;
-        /*characteristics |= IMAGE_FILE_LINE_NUMS_STRIPPED;*/
-        /*characteristics |= IMAGE_FILE_LOCAL_SYMS_STRIPPED;*/
         characteristics |= IMAGE_FILE_32BIT_MACHINE;
         characteristics |= IMAGE_FILE_DEBUG_STRIPPED;
+        
+        if (state->create_shared_library) {
+            characteristics |= IMAGE_FILE_DLL;
+        }
         
         if (!can_be_relocated) {
             characteristics |= IMAGE_FILE_RELOCS_STRIPPED;
@@ -2104,11 +2206,11 @@ void pe32_write (const char *filename) {
     
     {
     
-        unsigned short characteristics = IMAGE_DLLCHARACTERISTICS_NX_COMPAT;
+        unsigned short characteristics = 0;
         
-        /*if (can_be_relocated) {
+        if (can_be_relocated) {
             characteristics |= IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE;
-        }*/
+        }
         
         write721_to_byte_array (opthdr->DllCharacteristics, characteristics);
     
@@ -2372,11 +2474,11 @@ void pe64_write (const char *filename) {
     
     {
     
-        unsigned short characteristics = IMAGE_DLLCHARACTERISTICS_NX_COMPAT;
+        unsigned short characteristics = 0;
         
-        /*if (can_be_relocated) {
+        if (can_be_relocated) {
             characteristics |= IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE;
-        }*/
+        }
         
         write721_to_byte_array (opthdr->DllCharacteristics, characteristics);
     
