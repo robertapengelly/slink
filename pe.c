@@ -350,7 +350,7 @@ static void parse_def (const char *ifile) {
     char *line, *line_end, *real_line, *caret;
     unsigned long real_line_len;
     
-    unsigned long new_line_number = 1;
+    unsigned long new_line_number = 1, line_number = 1;
     unsigned long newlines;
     
     char *symbol_name, *real_symbol_name;
@@ -372,6 +372,9 @@ static void parse_def (const char *ifile) {
     
     while (!load_line (&line, &line_end, &real_line, &real_line_len, &newlines, fp, &load_line_internal_data)) {
     
+        line_number = new_line_number;
+        new_line_number += newlines + 1;
+        
         caret = (line = skip_whitespace (line));
         
         if (line < line_end) {
@@ -383,19 +386,22 @@ static void parse_def (const char *ifile) {
             
             }
             
-            symbol_name = caret;
-            
             while (isalnum ((int) *caret) || *caret == '_') {
                 caret++;
             }
             
-            line = caret;
+            if (*caret == '@') {
             
-            if (isspace ((int) *line)) {
-                line = skip_whitespace (line + 1);
+                caret++;
+                
+                while (isdigit ((int) *caret)) {
+                    caret++;
+                }
+            
             }
-            
-            *caret = '\0';
+           
+            symbol_name = xstrndup (line, caret - line);
+            line = skip_whitespace (caret);
             
             if (!has_exports) {
             
@@ -407,6 +413,8 @@ static void parse_def (const char *ifile) {
                 }
                 
                 has_exports = 1;
+                
+                free (symbol_name);
                 continue;
             
             }
@@ -414,7 +422,7 @@ static void parse_def (const char *ifile) {
             if (*line == '=') {
             
                 real_symbol_name = symbol_name;
-                caret = skip_whitespace (line + 1);
+                caret = (line = skip_whitespace (line + 1));
                 
                 if (!isalnum ((int) *caret) && *caret != '_') {
                 
@@ -423,28 +431,36 @@ static void parse_def (const char *ifile) {
                 
                 }
                 
-                symbol_name = caret;
-                
                 while (isalnum ((int) *caret) || *caret == '_') {
                     caret++;
                 }
                 
-                line = caret;
+                if (*caret == '@') {
                 
-                if (isspace ((int) *line)) {
-                    line = skip_whitespace (line + 1);
+                    caret++;
+                    
+                    while (isdigit ((int) *caret)) {
+                        caret++;
+                    }
+                
                 }
                 
-                *caret = '\0';
+                symbol_name = xstrndup (line, caret - line);
+                line = skip_whitespace (caret);
                 
                 if ((symbol = symbol_find (symbol_name))) {
-                    symbol->real_name = xstrdup (real_symbol_name);
+                
+                    symbol->real_name = real_symbol_name;
+                    export_symbol_callback (symbol);
+                
                 }
             
+            } else if ((symbol = symbol_find (symbol_name))) {
+                export_symbol_callback (symbol);
             }
             
-            if ((symbol = symbol_find (symbol_name))) {
-                export_symbol_callback (symbol);
+            if (*line != '\0' && *line != '\n') {
+                report_at (program_name, 0, REPORT_ERROR, "Stray '%c' on line %lu in %s", *line, line_number, ifile);
             }
         
         }
