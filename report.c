@@ -8,15 +8,19 @@
 #include    "report.h"
 unsigned int errors = 0;
 
-#ifndef     __PDOS__
-#if     defined (_WIN32)
+#if     defined (unix) || defined (__unix) || defined (__unix__) || defined (__APPLE__)
+static void reset_console_color (void) {
+    fprintf (stderr, "\033[0m");
+}
+
+static void set_console_color (int color) {
+    fprintf (stderr, "\033[%dm", color);
+}
+#elif   defined (_WIN32)
 # include   <windows.h>
 static int OriginalConsoleColor = -1;
-#endif
 
 static void reset_console_color (void) {
-
-#if     defined (_WIN32)
 
     HANDLE hStdError = GetStdHandle (STD_ERROR_HANDLE);
     
@@ -25,17 +29,9 @@ static void reset_console_color (void) {
     SetConsoleTextAttribute (hStdError, OriginalConsoleColor);
     OriginalConsoleColor = -1;
 
-#else
-
-    fprintf (stderr, "\033[0m");
-
-#endif
-
 }
 
 static void set_console_color (int color) {
-
-#if     defined (_WIN32)
 
     HANDLE hStdError = GetStdHandle (STD_ERROR_HANDLE);
     WORD wColor;
@@ -54,12 +50,6 @@ static void set_console_color (int color) {
     
     wColor = (OriginalConsoleColor & 0xF0) + (color & 0xF);
     SetConsoleTextAttribute (hStdError, wColor);
-
-#else
-
-    fprintf (stderr, "\033[%dm", color);
-
-#endif
 
 }
 #endif
@@ -92,7 +82,7 @@ static void output_message (const char *filename, unsigned int lineno, unsigned 
     
     if (type == REPORT_ERROR || type == REPORT_FATAL_ERROR) {
     
-#ifndef     __PDOS__
+#if     defined (unix) || defined (__unix) || defined (__unix__) || defined (__APPLE__) || defined (_WIN32)
         set_console_color (COLOR_ERROR);
 #endif
         
@@ -104,27 +94,23 @@ static void output_message (const char *filename, unsigned int lineno, unsigned 
     
     } else if (type == REPORT_INTERNAL_ERROR) {
     
-#ifndef     __PDOS__
+#if     defined (unix) || defined (__unix) || defined (__unix__) || defined (__APPLE__) || defined (_WIN32)
         set_console_color (COLOR_INTERNAL_ERROR);
 #endif
         
         fprintf (stderr, "internal error:");
     
-    } else if (type == REPORT_WARNING || type == REPORT_NOTE) {
+    } else if (type == REPORT_WARNING) {
     
-#ifndef     __PDOS__
+#if     defined (unix) || defined (__unix) || defined (__unix__) || defined (__APPLE__) || defined (_WIN32)
         set_console_color (COLOR_WARNING);
 #endif
         
-        if (type == REPORT_WARNING) {
-            fprintf (stderr, "warning:");
-        } else {
-            fprintf (stderr, "note:");
-        }
+        fprintf (stderr, "warning:");
     
     }
     
-#ifndef     __PDOS__
+#if     defined (unix) || defined (__unix) || defined (__unix__) || defined (__APPLE__) || defined (_WIN32)
     reset_console_color ();
 #endif
     
