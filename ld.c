@@ -540,19 +540,12 @@ int main (int argc, char **argv) {
         
         } else if (state->format == LD_FORMAT_AMD64_ELF || state->format == LD_FORMAT_I386_ELF) {
             state->base_address = 0x0040000;
-#if     defined(NO_LONG_LONG)
-        } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
-            state->base_address = 0x10000000;
-        } else if (state->format == LD_FORMAT_AARCH64_ELF) {
-            state->base_address = 0x14000000;
-        }
-#else
         } else if (state->format == LD_FORMAT_AMD64_MACHO || state->format == LD_FORMAT_AARCH64_MACHO) {
             state->base_address = 0x100000000;
         } else if (state->format == LD_FORMAT_AARCH64_ELF) {
             state->base_address = 0x140000000;
         }
-#endif
+    
     }
     
     if (state->format == LD_FORMAT_I386_AOUT) {

@@ -3,6 +3,7 @@
  *****************************************************************************/
 #include    <limits.h>
 #include    <stdio.h>
+#include    <stdint.h>
 #include    <stdlib.h>
 #include    <string.h>
 
@@ -14,7 +15,6 @@
 #include    "reloc.h"
 #include    "report.h"
 #include    "section.h"
-#include    "stdint.h"
 #include    "symbol.h"
 
 static uint64_t generic_read (struct section_part *part, struct reloc_entry *rel) {

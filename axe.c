@@ -260,27 +260,12 @@ static unsigned char *write_relocs_for_section64 (unsigned char *pos, struct sec
                 r_symbolnum = AXE_TEXT;
             }
             
-#if     ((ULONG_MAX >> 16) >> 16) == 0xffffffff
-            if ((part->reloc_arr[i].r_symbolnum >> 27) & 1) {
-                r_symbolnum |= (1LU << 59);
-            }
-            
-            integer_to_array (r_symbolnum | (size_log2 << 57), rel.r_symbolnum, 8, 0);
-#elif   defined (NO_LONG_LONG)
-            integer_to_array (r_symbolnum, rel.r_symbolnum, 4, 0);
-            
-            if ((part->reloc_arr[i].r_symbolnum >> 27) & 1) {
-                r_symbolnum = (1LU << 27);
-            }
-            
-            integer_to_array (r_symbolnum | (size_log2 << 25), rel.r_symbolnum + 4, 4, 0);
-#else
             if ((part->reloc_arr[i].r_symbolnum >> 27) & 1) {
                 r_symbolnum |= (1LLU << 59);
             }
             
             integer_to_array (r_symbolnum | (size_log2 << 57), rel.r_symbolnum, 8, 0);
-#endif
+            
             memcpy (pos, &rel, sizeof (rel));
             pos += sizeof (rel);
         

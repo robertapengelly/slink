@@ -1,6 +1,7 @@
 /******************************************************************************
  * @file            elf.c
  *****************************************************************************/
+#include    <stdint.h>
 #include    <stdio.h>
 #include    <stdlib.h>
 #include    <string.h>
@@ -10,7 +11,6 @@
 #include    "elf.h"
 #include    "report.h"
 #include    "section.h"
-#include    "stdint.h"
 #include    "symbol.h"
 
 #define     UNNAMED_SYMBOL_NAME         "(unnamed)"
@@ -84,29 +84,19 @@ static void translate_relocation (const char *filename, struct reloc_entry *relo
 
 }
 
-#ifndef     NO_LONG_LONG
-# define        ELF64_R_SYM(i)          ((i) >> 32)
-# define        ELF64_R_TYPE(i)         ((i) & 0xffffffff)
-#endif
+#define         ELF64_R_SYM(i)          ((i) >> 32)
+#define         ELF64_R_TYPE(i)         ((i) & 0xffffffff)
 
 static void translate_relocation64_addend (const char *filename, struct reloc_entry *reloc, struct elf64_rela *input_reloc, struct section_part *part, int endianess) {
 
     uint64_t r_info, r_offset;
     uint32_t symbol_index, rel_type;
     
-#if     defined (NO_LONG_LONG)
-    r_info = array_to_integer (input_reloc->r_info + 4, 4, endianess);
-    r_offset = array_to_integer (input_reloc->r_offset, 4, endianess);
-    
-    rel_type = array_to_integer (input_reloc->r_info, 4, endianess);
-    symbol_index = r_info;
-#else
     r_info = array_to_integer (input_reloc->r_info, 8, endianess);
     r_offset = array_to_integer (input_reloc->r_offset, 8, endianess);
     
     symbol_index = ELF64_R_SYM (r_info);
     rel_type = ELF64_R_TYPE (r_info);
-#endif
     
     if (symbol_index >= part->of->symbol_cnt) {
     

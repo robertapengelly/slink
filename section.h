@@ -4,8 +4,9 @@
 #ifndef     _SECTION_H
 #define     _SECTION_H
 
+#include    <stdint.h>
+
 #include    "reloc.h"
-#include    "stdint.h"
 #include    "symbol.h"
 
 struct object_file {

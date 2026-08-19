@@ -4,6 +4,7 @@
 #include    <ctype.h>
 #include    <errno.h>
 #include    <limits.h>
+#include    <stdint.h>
 #include    <stdio.h>
 #include    <stdlib.h>
 #include    <string.h>
@@ -15,7 +16,6 @@
 #include    "mz.h"
 #include    "pe.h"
 #include    "report.h"
-#include    "stdint.h"
 
 struct options_with_use {
 
@@ -534,10 +534,6 @@ uint64_t array_to_integer (unsigned char *arr, int size, int big_endian) {
     uint64_t value = 0;
     int i;
     
-#if     defined (NO_LONG_LONG) && ((ULONG_MAX >> 16) >> 16) < 0xffffffff
-    if (size == 8) { size = 4; }
-#endif
-    
     if (big_endian) {
     
         int j;
@@ -560,10 +556,6 @@ uint64_t array_to_integer (unsigned char *arr, int size, int big_endian) {
 
 void integer_to_array (uint64_t value, unsigned char *dest, int size, int big_endian) {
 
-#if     defined (NO_LONG_LONG) && ((ULONG_MAX >> 16) >> 16) < 0xffffffff
-    if (size == 8) { size = 4; }
-#endif
-    
     if (big_endian) {
     
         int i, j;

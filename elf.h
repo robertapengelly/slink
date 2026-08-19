@@ -217,7 +217,7 @@ void elf32_write (const char *filename);
 void read_elf64_object (const char *filename, unsigned char *data, unsigned long data_size, int endianess);
 void elf64_write (const char *filename);
 
-#include    "stdint.h"
+#include    <stdint.h>
 uint64_t elf_get_first_section_rva (void);
 
 #endif      /* _ELF_H */

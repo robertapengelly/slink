@@ -19,7 +19,7 @@ struct ld_option {
 #define     LD_OPTION_NO_ARG            0
 #define     LD_OPTION_HAS_ARG           1
 
-#include    "stdint.h"
+#include    <stdint.h>
 
 uint64_t array_to_integer (unsigned char *arr, int size, int big_endian);
 void integer_to_array (uint64_t value, unsigned char *dest, int size, int big_endian);
