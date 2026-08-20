@@ -18,7 +18,7 @@ struct ld_state {
     const char *output_map_filename;
     uint64_t base_address;
     
-    const char *output_filename;
+    const char *output_filename, *output_implib_filename;
     int create_shared_library, format;
     
     int emit_relocs, use_custom_base_address;

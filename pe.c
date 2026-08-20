@@ -19,10 +19,8 @@
 #include    "section.h"
 #include    "write7x.h"
 
-static char *output_implib_filename = 0;
-static int kill_at = 0;
-
 static unsigned short subsystem = IMAGE_SUBSYSTEM_WINDOWS_CUI;
+static int kill_at = 0;
 
 static uint64_t section_alignment = DEFAULT_SECTION_ALIGNMENT;
 static uint64_t file_alignment = DEFAULT_FILE_ALIGNMENT;
@@ -206,11 +204,11 @@ void pe_use_option (const char *cmd_arg, int idx, const char *optarg) {
         
         case LD_OPTION_OUT_IMPLIB: {
         
-            if (output_implib_filename) {
-                free (output_implib_filename);
+            if (state->output_implib_filename) {
+                free ((char *) state->output_implib_filename);
             }
             
-            output_implib_filename = xstrdup (optarg);
+            state->output_implib_filename = xstrdup (optarg);
             break;
         
         }
@@ -1070,7 +1068,7 @@ static unsigned long write_data (FILE *outfile, void *data, unsigned long data_s
 
     if (fwrite (data, data_size, 1, outfile) != 1) {
     
-        report_at (program_name, 0, REPORT_ERROR, "failed whilst writing data to '%s'", output_implib_filename);
+        report_at (program_name, 0, REPORT_ERROR, "failed whilst writing data to '%s'", state->output_implib_filename);
         return 0;
     
     }
@@ -1234,9 +1232,9 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
     
     }
     
-    if (!(outfile = fopen (output_implib_filename, "wb"))) {
+    if (!(outfile = fopen (state->output_implib_filename, "wb"))) {
     
-        report_at (program_name, 0, REPORT_ERROR, "failed to open '%s' for writing", output_implib_filename);
+        report_at (program_name, 0, REPORT_ERROR, "failed to open '%s' for writing", state->output_implib_filename);
         return;
     
     }
@@ -1773,7 +1771,26 @@ static void write_implib (struct export_name *export_names, unsigned long num_na
 }
 
 static int export_name_compar (const void *a, const void *b) {
-    return strcmp (((struct export_name *) a)->name, ((struct export_name *) b)->name);
+
+    struct export_name *first = (struct export_name *) a;
+    struct export_name *second = (struct export_name *) b;
+    
+    if (first->real_name) {
+    
+        if (second->real_name) {
+            return strcmp (first->real_name, second->real_name);
+        }
+        
+        return strcmp (first->real_name, second->name);
+    
+    }
+    
+    if (second->real_name) {
+        return strcmp (first->name, second->real_name);
+    }
+    
+    return strcmp (first->name, second->name);
+
 }
 
 static char *unat_name (const char *orig_name) {
@@ -1854,7 +1871,7 @@ static void generate_edata (void) {
     
     qsort (export_names, num_names, sizeof (*export_names), &export_name_compar);
     
-    if (output_implib_filename) {
+    if (state->output_implib_filename) {
         write_implib (export_names, num_names, ordinal_base);
     }
     
@@ -2087,7 +2104,7 @@ void pe_before_link (void) {
     
     if (export_name_list) {
         generate_edata ();
-    } else if (output_implib_filename) {
+    } else if (state->output_implib_filename) {
         write_implib (0, 0, 0);
     }
     

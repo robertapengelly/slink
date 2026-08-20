@@ -31,6 +31,10 @@ static void cleanup (void) {
         if (state->output_filename) {
             remove (state->output_filename);
         }
+        
+        if (state->output_implib_filename) {
+            remove (state->output_implib_filename);
+        }
     
     }
 
