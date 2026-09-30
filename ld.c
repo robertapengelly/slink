@@ -486,7 +486,7 @@ int main (int argc, char **argv) {
     
     if (argc && *argv) {
     
-        char *p;
+        const char *p;
         program_name = *argv;
         
         if ((p = strrchr (program_name, '/')) || (p = strrchr (program_name, '\\'))) {

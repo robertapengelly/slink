@@ -952,8 +952,8 @@ struct symbol_info *create_symbol_list (struct export_name *export_name, unsigne
     struct symbol_info *info_list = 0;
     struct symbol_info **last_info_list_p = &info_list;
     
-    char *name, *p;
-    const char *module_name;
+    const char *module_name, *p;
+    char *name;
     
     struct symbol_info *symbol_info;
     unsigned long i, j;
@@ -1187,10 +1187,12 @@ struct data_entry {
 static void write_implib (struct export_name *export_names, unsigned long num_names, unsigned long ordinal_base) {
 
     struct symbol_info *info_list, *info;
-    unsigned long *offsets, offset_count, symbol_count, length, i;
     
+    unsigned long *offsets, offset_count, symbol_count, length, i;
     unsigned long module_name_length;
-    char *header_name, *module_name, *p;
+    
+    const char *p;
+    char *header_name, *module_name;
     
     unsigned long offset = 0, offset2 = 0, offset3 = 0;
     int bHeaderName;
@@ -1795,7 +1797,7 @@ static int export_name_compar (const void *a, const void *b) {
 
 static char *unat_name (const char *orig_name) {
 
-    char *at_p;
+    const char *at_p;
     return ((at_p = strchr (orig_name, '@')) ? xstrndup (orig_name, at_p - orig_name) : xstrdup (orig_name));
 
 }
@@ -2740,7 +2742,7 @@ static char *unprefix_name (const char *orig_name) {
 
 static char *undecorate_name (const char *orig_name) {
 
-    char *at_p;
+    const char *at_p;
     
     if (orig_name[0] == '_') {
         orig_name++;
