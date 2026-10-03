@@ -1954,7 +1954,7 @@ static void generate_edata (void) {
             
             if (export_names[i].real_name) {
             
-                symbol->name = xmalloc (strlen (export_names[i].real_name) + 1);
+                symbol->real_name = xmalloc (strlen (export_names[i].real_name) + 1);
                 sprintf (symbol->real_name, "%s", export_names[i].real_name);
             
             }
