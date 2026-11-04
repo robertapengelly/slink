@@ -2895,13 +2895,8 @@ static void import_generate_import (const char *import_name, short ordinal_hint,
     
     }
     
-    symbol->name = xmalloc (7 + strlen (import_name) + 1);
-    
-    if (state->leading_underscore) {
-        sprintf (symbol->name, "__imp__%s", import_name);
-    } else {
-        sprintf (symbol->name, "__imp_%s", import_name);
-    }
+    symbol->name = xmalloc (6 + strlen (import_name) + 1);
+    sprintf (symbol->name, "__imp_%s", import_name);
     
     symbol->value = 0;
     symbol->part = dot_idata5_part;
