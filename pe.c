@@ -307,7 +307,7 @@ struct name_list {
 static struct name_list *export_name_list = 0;
 static struct name_list **last_export_name_list_p = &export_name_list;
 
-static void export_symbol_callback (struct symbol *symbol) {
+static void export_symbol_callback (struct symbol *symbol, int data) {
 
     struct name_list *name_list;
     
@@ -335,7 +335,7 @@ static void export_symbol_callback (struct symbol *symbol) {
     
     }
     
-    name_list->info = (symbol->part->section->flags & SECTION_FLAG_CODE) ? 0 : 1;
+    name_list->info = data || !(symbol->part->section->flags & SECTION_FLAG_CODE);
     name_list->next = 0;
     
     *last_export_name_list_p = name_list;
@@ -377,6 +377,8 @@ static void parse_def (const char *ifile) {
         
         if (line < line_end) {
         
+            int data = 0;
+            
             if (!isalnum ((int) *caret) && *caret != '_') {
             
                 report_at (ifile, 0, REPORT_ERROR, "expected ident");
@@ -447,14 +449,26 @@ static void parse_def (const char *ifile) {
                 line = skip_whitespace (caret);
                 
                 if ((symbol = symbol_find (symbol_name))) {
-                
                     symbol->real_name = real_symbol_name;
-                    export_symbol_callback (symbol);
-                
                 }
             
-            } else if ((symbol = symbol_find (symbol_name))) {
-                export_symbol_callback (symbol);
+            } else {
+                symbol = symbol_find (symbol_name);
+            }
+            
+            if (strncmp (line, "DATA", 4) == 0 && (line[4] == '\0' || isspace ((int) line[4]))) {
+            
+                if (symbol) {
+                    printf ("%s\n", symbol->name);
+                }
+                
+                line = skip_whitespace (line + 4);
+                data = 1;
+            
+            }
+            
+            if (symbol) {
+                export_symbol_callback (symbol, data);
             }
             
             if (*line != '\0' && *line != '\n') {
