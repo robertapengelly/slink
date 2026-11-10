@@ -458,10 +458,6 @@ static void parse_def (const char *ifile) {
             
             if (strncmp (line, "DATA", 4) == 0 && (line[4] == '\0' || isspace ((int) line[4]))) {
             
-                if (symbol) {
-                    printf ("%s\n", symbol->name);
-                }
-                
                 line = skip_whitespace (line + 4);
                 data = 1;
             
